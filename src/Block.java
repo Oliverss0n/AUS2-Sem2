@@ -1,3 +1,4 @@
+import java.io.*;
 import java.util.ArrayList;
 
 public class Block<T extends IRecord<T>> {
@@ -18,8 +19,8 @@ public class Block<T extends IRecord<T>> {
         return validCount;
     }
 
-    public void setValidCount(int vc) {
-        this.validCount = vc;
+    public void setValidCount(int validCount) {
+        this.validCount = validCount;
     }
 
     public ArrayList<T> getList() {
@@ -34,52 +35,62 @@ public class Block<T extends IRecord<T>> {
     // SERIALIZÁCIA BLOKU DO BAJTOV
     // ===================================================
     public ArrayList<Byte> getBytes() {
-        ArrayList<Byte> out = new ArrayList<>(getBlockSize());
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(bos);
 
-        // Zapíš všetky T-čka (aj neplatné)
-        for (int i = 0; i < blockFactor; i++) {
-            out.addAll(list.get(i).getBytes());
+        try {
+            // 1) Zapíš všetky T (aj neplatné)
+            for (int i = 0; i < blockFactor; i++) {
+                ArrayList<Byte> rec = list.get(i).getBytes();
+                for (byte b : rec) dos.writeByte(b);
+            }
+
+            // 2) Zapíš validCount — jednoducho!
+            dos.writeInt(validCount);
+            dos.flush();
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error serializing block", e);
         }
 
-        // Zapíš validCount
-        out.add((byte)(validCount >> 24));
-        out.add((byte)(validCount >> 16));
-        out.add((byte)(validCount >> 8));
-        out.add((byte)(validCount));
-
+        // Konverzia na ArrayList<Byte>
+        byte[] raw = bos.toByteArray();
+        ArrayList<Byte> out = new ArrayList<>(raw.length);
+        for (byte b : raw) out.add(b);
         return out;
     }
 
     // ===================================================
-    // DESERIALIZÁCIA BLOKU Z BAJTOV
+    // DESERIALIZÁCIA BLOKU — BEZ POSUNOV !!
     // ===================================================
     public void fromBytes(ArrayList<Byte> bytes) {
+        byte[] raw = new byte[bytes.size()];
+        for (int i = 0; i < bytes.size(); i++) raw[i] = bytes.get(i);
 
-        int pos = 0;
-        int recSize = prototype.getSize();
+        ByteArrayInputStream bis = new ByteArrayInputStream(raw);
+        DataInputStream dis = new DataInputStream(bis);
 
-        for (int i = 0; i < blockFactor; i++) {
+        try {
+            int recSize = prototype.getSize();
 
-            T obj = list.get(i);  // už existujúce T vytvorené mimo blok
+            // 1) načítaj všetky T
+            for (int i = 0; i < blockFactor; i++) {
 
-            ArrayList<Byte> slice = new ArrayList<>(recSize);
-            for (int j = 0; j < recSize; j++) {
-                slice.add(bytes.get(pos + j));
+                byte[] slice = new byte[recSize];
+                dis.readFully(slice); // načítaj presne recSize bajtov
+
+                ArrayList<Byte> arr = new ArrayList<>(recSize);
+                for (byte b : slice) arr.add(b);
+
+                list.get(i).fromBytes(arr);
             }
 
-            obj.fromBytes(slice);
+            // 2) načítaj validCount
+            this.validCount = dis.readInt();
 
-            pos += recSize;
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading block", e);
         }
-
-        // načítaj validCount
-        int vc =
-                ((bytes.get(pos) & 0xFF) << 24) |
-                        ((bytes.get(pos+1) & 0xFF) << 16) |
-                        ((bytes.get(pos+2) & 0xFF) << 8) |
-                        ((bytes.get(pos+3) & 0xFF));
-
-        this.validCount = vc;
     }
 
     @Override

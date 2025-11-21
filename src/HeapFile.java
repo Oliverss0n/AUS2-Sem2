@@ -10,9 +10,8 @@ public class HeapFile<T extends IRecord<T>> {
     private int blockSize;
     private int blockFactor;
 
-    private ArrayList<Long> freeBlocks; // toto asi Block
-    private ArrayList<Long> partialBlocks; // toto asi block
-
+    private ArrayList<Long> freeBlocks;
+    private ArrayList<Long> partialBlocks;
     private T prototype;
 
     // ============================================================
@@ -45,7 +44,7 @@ public class HeapFile<T extends IRecord<T>> {
                 list.add((T) prototype.getClass().newInstance());
             } catch (Exception e) {
                 throw new RuntimeException("Trieda musí mať prázdny konštruktor!");
-            }   // TOTO JE JEDINÉ, ČO MUSÍ T MAŤ NAVYŠE
+            }
         }
         return new Block<>(blockFactor, prototype, list);
     }
@@ -61,16 +60,16 @@ public class HeapFile<T extends IRecord<T>> {
         if (!partialBlocks.isEmpty()) {
             addr = partialBlocks.get(0);
 
-            Block<T> b = readBlock(addr);
+            Block<T> block = readBlock(addr);
 
-            int vc = b.getValidCount();
-            b.getList().set(vc, data);
-            b.setValidCount(vc + 1);
+            int validCount = block.getValidCount();
+            block.getList().set(validCount, data);
+            block.setValidCount(validCount + 1);
 
-            if (b.getValidCount() == blockFactor)
+            if (block.getValidCount() == blockFactor)
                 partialBlocks.remove(0);
 
-            writeBlock(addr, b);
+            writeBlock(addr, block);
             return addr;
         }
 
@@ -120,12 +119,12 @@ public class HeapFile<T extends IRecord<T>> {
     // DELETE
     // ============================================================
     public boolean delete(long addr, T pattern) throws Exception {
-        Block<T> b = readBlock(addr);
-        int vc = b.getValidCount();
+        Block<T> block = readBlock(addr);
+        int validCount = block.getValidCount();
 
         int index = -1;
-        for (int i = 0; i < vc; i++) {
-            if (b.getList().get(i).isEqual(pattern)) {
+        for (int i = 0; i < validCount; i++) {
+            if (block.getList().get(i).isEqual(pattern)) {
                 index = i;
                 break;
             }
@@ -133,17 +132,17 @@ public class HeapFile<T extends IRecord<T>> {
 
         if (index == -1) return false;
 
-        b.getList().set(index, b.getList().get(vc - 1));
-        b.setValidCount(vc - 1);
+        block.getList().set(index, block.getList().get(validCount - 1));
+        block.setValidCount(validCount - 1);
 
         // blok sa vyprázdnil
-        if (b.getValidCount() == 0)
+        if (block.getValidCount() == 0)
             handleEmptyBlock(addr);
 
         else if (!partialBlocks.contains(addr))
             partialBlocks.add(addr);
 
-        writeBlock(addr, b);
+        writeBlock(addr, block);
         return true;
     }
 
@@ -210,12 +209,12 @@ public class HeapFile<T extends IRecord<T>> {
     public void print() throws Exception {
         long size = raf.length();
         for (long addr = 0; addr < size; addr += blockSize) {
-            Block<T> b = readBlock(addr);
+            Block<T> block = readBlock(addr);
 
             System.out.println("Block @" + addr);
-            System.out.println("Valid: " + b.getValidCount());
-            for (int i = 0; i < b.getValidCount(); i++)
-                System.out.println("   " + b.getList().get(i));
+            System.out.println("Valid: " + block.getValidCount());
+            for (int i = 0; i < block.getValidCount(); i++)
+                System.out.println("   " + block.getList().get(i));
         }
     }
 

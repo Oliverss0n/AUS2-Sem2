@@ -85,7 +85,9 @@ public class Person implements IRecord<Person> {
 
         try {
             byte[] arr = new byte[a.size()];
-            for (int i = 0; i < a.size(); i++) arr[i] = a.get(i);
+            for (int i = 0; i < a.size(); i++) {
+                arr[i] = a.get(i);
+            }
 
             DataInputStream dis = new DataInputStream(new ByteArrayInputStream(arr));
 
@@ -117,11 +119,23 @@ public class Person implements IRecord<Person> {
     }
 
     // doplnenie nulami
-    private byte[] pad(byte[] src, int len) {
+    /*private byte[] pad(byte[] src, int len) {
         byte[] out = new byte[len];
         System.arraycopy(src, 0, out, 0, Math.min(src.length, len));
         return out;
+    }*/
+    private byte[] pad(byte[] src, int length) {
+        byte[] out = new byte[length];
+        for (int i = 0; i < length; i++) {
+            if (i < src.length) {
+                out[i] = src[i];
+            } else {
+                out[i] = 0;
+            }
+        }
+        return out;
     }
+
 
     public String getName() {
         return name;
