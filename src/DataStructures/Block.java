@@ -1,3 +1,5 @@
+package DataStructures;
+
 import java.io.*;
 import java.util.ArrayList;
 
@@ -95,10 +97,13 @@ public class Block<T extends IRecord<T>> {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("Block(valid=" + validCount + "):\n");
+        StringBuilder sb = new StringBuilder();
+        sb.append("validCount=").append(validCount).append("\n");
+
         for (int i = 0; i < validCount; i++) {
-            sb.append("   ").append(list.get(i)).append("\n");
+            sb.append("  ").append(i).append(": ").append(list.get(i)).append("\n");
         }
         return sb.toString();
     }
+
 }

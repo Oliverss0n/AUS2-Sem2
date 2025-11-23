@@ -1,3 +1,7 @@
+package Model;
+
+import DataStructures.IRecord;
+
 import java.io.*;
 import java.util.ArrayList;
 
@@ -37,8 +41,10 @@ public class Person implements IRecord<Person> {
 
     @Override
     public int getSize() {
-        return NAME_LEN + 4 + SURNAME_LEN + 4 + ID_LEN + 4 + 12;
+        // LEN fixné dĺžky + dátum (3×int)
+        return NAME_LEN + SURNAME_LEN + ID_LEN + 12;
     }
+
 
     // ======================================================
     // BYTE ARRAY -> univerzálna metóda, najjednoduchšie
@@ -50,26 +56,21 @@ public class Person implements IRecord<Person> {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             DataOutputStream dos = new DataOutputStream(baos);
 
-            // NAME
-            byte[] nb = name.getBytes();
-            dos.write(pad(nb, NAME_LEN));
-            dos.writeInt(nb.length);
+            // NAME (fixed length)
+            dos.write(pad(name.getBytes(), NAME_LEN));
 
             // SURNAME
-            byte[] sb = surname.getBytes();
-            dos.write(pad(sb, SURNAME_LEN));
-            dos.writeInt(sb.length);
+            dos.write(pad(surname.getBytes(), SURNAME_LEN));
 
             // ID
-            byte[] ib = id.getBytes();
-            dos.write(pad(ib, ID_LEN));
-            dos.writeInt(ib.length);
+            dos.write(pad(id.getBytes(), ID_LEN));
 
             // DATE
             dos.writeInt(year);
             dos.writeInt(month);
             dos.writeInt(day);
 
+            // return ArrayList<Byte>
             byte[] arr = baos.toByteArray();
             ArrayList<Byte> out = new ArrayList<>(arr.length);
             for (byte b : arr) out.add(b);
@@ -80,14 +81,13 @@ public class Person implements IRecord<Person> {
         }
     }
 
+
     @Override
     public void fromBytes(ArrayList<Byte> a) {
 
         try {
             byte[] arr = new byte[a.size()];
-            for (int i = 0; i < a.size(); i++) {
-                arr[i] = a.get(i);
-            }
+            for (int i = 0; i < a.size(); i++) arr[i] = a.get(i);
 
             DataInputStream dis = new DataInputStream(new ByteArrayInputStream(arr));
 
@@ -96,17 +96,17 @@ public class Person implements IRecord<Person> {
             // NAME
             tmp = new byte[NAME_LEN];
             dis.readFully(tmp);
-            name = new String(tmp, 0, dis.readInt());
+            name = new String(tmp).trim();
 
             // SURNAME
             tmp = new byte[SURNAME_LEN];
             dis.readFully(tmp);
-            surname = new String(tmp, 0, dis.readInt());
+            surname = new String(tmp).trim();
 
             // ID
             tmp = new byte[ID_LEN];
             dis.readFully(tmp);
-            id = new String(tmp, 0, dis.readInt());
+            id = new String(tmp).trim();
 
             // DATE
             year = dis.readInt();
@@ -160,6 +160,11 @@ public class Person implements IRecord<Person> {
     public int getDay() {
         return day;
     }
+
+    public void fromId(String newId) {
+        this.id = newId;
+    }
+
 
     @Override
     public String toString() {

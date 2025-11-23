@@ -1,3 +1,5 @@
+package DataStructures;
+
 import java.io.*;
 import java.util.*;
 
@@ -35,7 +37,7 @@ public class HeapFile<T extends IRecord<T>> {
     }
 
     // ============================================================
-    // VYTVORÍ PRÁZDNY BLOK (bez generovania T !)
+    // VYTVORÍ PRÁZDNY BLOK
     // ============================================================
     private Block<T> emptyBlock() {
         ArrayList<T> list = new ArrayList<>(blockFactor);
@@ -77,14 +79,14 @@ public class HeapFile<T extends IRecord<T>> {
         if (!freeBlocks.isEmpty()) {
             addr = freeBlocks.remove(0);
 
-            Block<T> b = emptyBlock();
-            b.getList().set(0, data);
-            b.setValidCount(1);
+            Block<T> block = emptyBlock();
+            block.getList().set(0, data);
+            block.setValidCount(1);
 
             if (blockFactor > 1)
                 partialBlocks.add(addr);
 
-            writeBlock(addr, b);
+            writeBlock(addr, block);
             return addr;
         }
 
@@ -106,10 +108,10 @@ public class HeapFile<T extends IRecord<T>> {
     // GET
     // ============================================================
     public T get(long addr, T pattern) throws Exception {
-        Block<T> b = readBlock(addr);
+        Block<T> block = readBlock(addr);
 
-        for (int i = 0; i < b.getValidCount(); i++) {
-            T x = b.getList().get(i);
+        for (int i = 0; i < block.getValidCount(); i++) {
+            T x = block.getList().get(i);
             if (x.isEqual(pattern)) return x;
         }
         return null;
@@ -135,7 +137,6 @@ public class HeapFile<T extends IRecord<T>> {
         block.getList().set(index, block.getList().get(validCount - 1));
         block.setValidCount(validCount - 1);
 
-        // blok sa vyprázdnil
         if (block.getValidCount() == 0)
             handleEmptyBlock(addr);
 
@@ -147,16 +148,21 @@ public class HeapFile<T extends IRecord<T>> {
     }
 
     private void handleEmptyBlock(long addr) throws Exception {
+
+        partialBlocks.remove(addr);
+
         long fileEnd = raf.length() - blockSize;
 
-        if (addr == fileEnd)
+        if (addr == fileEnd) {
             shrinkFile();
-        else
+        } else {
             freeBlocks.add(addr);
+        }
     }
 
+
     // ============================================================
-    // SKRÁTENIE SÚBORU – podľa tvojich poznámok
+    // SKRÁTENIE SÚBORU
     // ============================================================
     private void shrinkFile() throws Exception {
         Collections.sort(freeBlocks);
@@ -195,31 +201,25 @@ public class HeapFile<T extends IRecord<T>> {
 
     private void writeBlock(long addr, Block<T> b) throws Exception {
         ArrayList<Byte> arr = b.getBytes();
-        byte[] raw = new byte[arr.size()];
 
-        for (int i = 0; i < raw.length; i++) raw[i] = arr.get(i);
+        if (arr.size() > blockSize) {
+            throw new RuntimeException("Block overflow: " + arr.size() + " > " + blockSize);
+        }
+        while (arr.size() < blockSize) {
+            arr.add((byte)0);
+        }
+
+        byte[] raw = new byte[blockSize];
+        for (int i = 0; i < blockSize; i++) raw[i] = arr.get(i);
 
         raf.seek(addr);
         raf.write(raw);
     }
 
-    // ============================================================
-    // PRINT
-    // ============================================================
-    public void print() throws Exception {
-        long size = raf.length();
-        for (long addr = 0; addr < size; addr += blockSize) {
-            Block<T> block = readBlock(addr);
 
-            System.out.println("Block @" + addr);
-            System.out.println("Valid: " + block.getValidCount());
-            for (int i = 0; i < block.getValidCount(); i++)
-                System.out.println("   " + block.getList().get(i));
-        }
-    }
 
     // ============================================================
-    // META – PRESNE TO, ČO ŽIADA UČITEĽ
+    // METADARTA
     // ============================================================
     private void saveMetadata() throws Exception {
         PrintWriter pw = new PrintWriter(metaPath);
@@ -237,10 +237,10 @@ public class HeapFile<T extends IRecord<T>> {
     }
 
     private void loadMetadata() throws Exception {
-        File f = new File(metaPath);
-        if (!f.exists()) return;
+        File file = new File(metaPath);
+        if (!file.exists()) return;
 
-        Scanner sc = new Scanner(f);
+        Scanner sc = new Scanner(file);
 
         blockFactor = Integer.parseInt(sc.nextLine());
         blockSize   = Integer.parseInt(sc.nextLine());
@@ -259,7 +259,7 @@ public class HeapFile<T extends IRecord<T>> {
     }
 
     // ============================================================
-    // CLOSE — ULOŽÍ METADÁTA!
+    // CLOSE
     // ============================================================
     public void close() throws Exception {
         saveMetadata();
@@ -271,5 +271,84 @@ public class HeapFile<T extends IRecord<T>> {
     public Block<T> readBlockForTest(long addr) throws Exception {
         return readBlock(addr);
     }
+
+    public void print() {
+        try {
+            long fileLength = raf.length();
+
+            System.out.println("======= HEAPFILE PRINT START =======");
+            System.out.println("File length: " + fileLength + " bytes");
+            System.out.println("DataStructure.Block size: " + blockSize + " bytes\n");
+
+            long addr = 0;
+            int blockIndex = 0;
+
+            while (addr + blockSize <= fileLength) {
+
+                Block<T> block = readBlock(addr);
+
+                System.out.println("----- BLOCK " + blockIndex + " @ address " + addr + " -----");
+                System.out.println("validCount = " + block.getValidCount());
+
+                for (int i = 0; i < block.getValidCount(); i++) {
+                    T rec = block.getList().get(i);
+                    System.out.println(" [" + i + "] " + rec);
+                }
+
+
+                System.out.println();
+
+                addr += blockSize;
+                blockIndex++;
+            }
+
+            System.out.println("======= HEAPFILE PRINT END =======");
+
+            System.out.println("Free blocks: " + freeBlocks);
+            System.out.println("Semi-free blocks: " + partialBlocks);
+
+        } catch (Exception e) {
+            throw new RuntimeException("PRINT FAILED: " + e.getMessage(), e);
+        }
+    }
+
+    public String printToString() {
+        StringBuilder sb = new StringBuilder();
+
+        try {
+            long fileLength = raf.length();
+            long addr = 0;
+            int blockIndex = 0;
+
+            sb.append("File length: ").append(fileLength).append(" bytes\n");
+            sb.append("Block size: ").append(blockSize).append(" bytes\n\n");
+
+            while (addr + blockSize <= fileLength) {
+                Block<T> block = readBlock(addr);
+
+                sb.append("----- BLOCK ").append(blockIndex)
+                        .append(" @ address ").append(addr).append(" -----\n");
+                sb.append("validCount = ").append(block.getValidCount()).append("\n");
+
+                for (int i = 0; i < block.getValidCount(); i++) {
+                    sb.append(" [").append(i).append("] ")
+                            .append(block.getList().get(i)).append("\n");
+                }
+                sb.append("\n");
+
+                addr += blockSize;
+                blockIndex++;
+            }
+
+            sb.append("Free blocks: ").append(freeBlocks).append("\n");
+            sb.append("Semi-free blocks: ").append(partialBlocks).append("\n");
+
+        } catch (Exception e) {
+            sb.append("PRINT FAILED: ").append(e.getMessage()).append("\n");
+        }
+
+        return sb.toString();
+    }
+
 
 }
