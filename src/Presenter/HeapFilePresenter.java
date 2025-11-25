@@ -20,6 +20,11 @@ public class HeapFilePresenter {
         this.view = view;
         this.heapFile = new HeapFile<>("data.bin", 256, new Person());
     }
+    public HeapFilePresenter(HeapFileView view, HeapFile<Person> shared) {
+        this.view = view;
+        this.heapFile = shared;
+    }
+
 
     public void onInsertRandom() {
         try {

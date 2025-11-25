@@ -8,7 +8,7 @@ public class Block<T extends IRecord<T>> {
     private ArrayList<T> list;
     private int validCount;
     private int blockFactor;
-    private T prototype; //kvôli getSize
+    private T prototype;
 
     public Block(int blockFactor, T prototype, ArrayList<T> emptyList) {
         this.blockFactor = blockFactor;

@@ -125,8 +125,9 @@ public class HeapFile<T extends IRecord<T>> {
         block.getList().set(index, block.getList().get(validCount - 1));
         block.setValidCount(validCount - 1);
 
-        if (block.getValidCount() == 0)
+        if (block.getValidCount() == 0) {
             handleEmptyBlock(addr);
+        }
 
         else if (!partialBlocks.contains(addr)){
             partialBlocks.add(addr);
@@ -143,9 +144,14 @@ public class HeapFile<T extends IRecord<T>> {
         long fileEnd = raf.length() - blockSize;
 
         if (addr == fileEnd) {
+            if (!freeBlocks.contains(addr))
+                freeBlocks.add(addr);
+
             shrinkFile();
-        } else {
-            freeBlocks.add(addr);
+        }
+        else {
+            if (!freeBlocks.contains(addr))
+                freeBlocks.add(addr);
         }
     }
 
@@ -266,15 +272,17 @@ public class HeapFile<T extends IRecord<T>> {
             while (addr + blockSize <= fileLength) {
                 Block<T> block = readBlock(addr);
 
-                sb.append("----- BLOCK ").append(blockIndex)
-                        .append(" on address ").append(addr).append(" -----\n");
-                sb.append("validCount = ").append(block.getValidCount()).append("\n");
+                if (block.getValidCount() > 0) {
+                    sb.append("----- BLOCK ").append(blockIndex)
+                            .append(" on address ").append(addr).append(" -----\n");
+                    sb.append("validCount = ").append(block.getValidCount()).append("\n");
 
-                for (int i = 0; i < block.getValidCount(); i++) {
-                    sb.append(" [").append(i).append("] ")
-                            .append(block.getList().get(i)).append("\n");
+                    for (int i = 0; i < block.getValidCount(); i++) {
+                        sb.append("  [").append(i).append("] ")
+                                .append(block.getList().get(i)).append("\n");
+                    }
+                    sb.append("\n");
                 }
-                sb.append("\n");
 
                 addr += blockSize;
                 blockIndex++;
@@ -291,4 +299,18 @@ public class HeapFile<T extends IRecord<T>> {
     }
 
 
+
+    public long getFileLength() throws Exception {
+        return raf.length();
+    }
+    public int getBlockSize() {
+        return blockSize;
+    }
+    public Block<T> readBlockForTest(long addr) throws Exception {
+        return readBlock(addr);
+    }
+
+    public int getBlockFactor() {
+        return blockFactor;
+    }
 }

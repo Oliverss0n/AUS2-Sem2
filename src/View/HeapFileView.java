@@ -8,7 +8,7 @@ import java.awt.*;
 public class HeapFileView extends JFrame {
 
     public JButton btnInsert = new JButton("Insert");
-    public JButton btnBatch = new JButton("Generate 100");
+    public JButton btnBatch = new JButton("Generate inserts");
     public JButton btnGet = new JButton("Get by ID");
     public JButton btnDelete = new JButton("Delete by ID");
     public JButton btnPrint = new JButton("Print");
