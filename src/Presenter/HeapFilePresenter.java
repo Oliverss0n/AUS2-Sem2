@@ -13,20 +13,19 @@ public class HeapFilePresenter {
     private final HeapFileView view;
     private final Random rnd = new Random();
 
-    // Počet generovaných osôb naraz
-    private static final int BATCH_COUNT = 100;
+    private static final int GEN_COUNT = 100;
+    private int idCounter = 0;
 
     public HeapFilePresenter(HeapFileView view) throws Exception {
         this.view = view;
-        this.heapFile = new HeapFile<>("data.bin", 128, new Person());
+        this.heapFile = new HeapFile<>("data.bin", 256, new Person());
     }
 
-    // ---- Insert one ----
     public void onInsertRandom() {
         try {
             Person p = randomPerson();
             long addr = heapFile.insert(p);
-            view.append("Inserted: " + p + " @addr=" + addr);
+            view.append("Inserted: " + p + " on addr=" + addr);
         } catch (Exception e) {
             error("Insert failed", e);
         }
@@ -37,12 +36,11 @@ public class HeapFilePresenter {
             String id = JOptionPane.showInputDialog("Enter ID:");
             if (id == null || id.isEmpty()) return;
 
-            String addrStr = JOptionPane.showInputDialog("Enter block address (0, 500, 1000...):");
+            String addrStr = JOptionPane.showInputDialog("Enter block address:");
             if (addrStr == null || addrStr.isEmpty()) return;
 
             long addr = Long.parseLong(addrStr);
 
-            // record pattern
             Person p = new Person();
             p.fromId(id);
 
@@ -63,7 +61,7 @@ public class HeapFilePresenter {
             String id = JOptionPane.showInputDialog("Enter ID to delete:");
             if (id == null || id.isEmpty()) return;
 
-            String addrStr = JOptionPane.showInputDialog("Enter block address (0, 500, 1000...):");
+            String addrStr = JOptionPane.showInputDialog("Enter block address:");
             if (addrStr == null || addrStr.isEmpty()) return;
 
             long addr = Long.parseLong(addrStr);
@@ -73,47 +71,45 @@ public class HeapFilePresenter {
 
             boolean ok = heapFile.delete(addr, p);
 
-            if (ok)
+            if (ok) {
                 view.append("DELETED at addr=" + addr + ": " + id);
-            else
+            }
+            else {
                 view.append("NOT FOUND for delete at addr=" + addr + ": " + id);
+            }
 
         } catch (Exception e) {
             error("DELETE failed", e);
         }
     }
 
-
-    // ---- Generate batch ----
     public void onGenerateBatch() {
         try {
-            view.append("\n=== GENERATING " + BATCH_COUNT + " PERSONS ===");
+            view.append("\n=== GENERATING " + GEN_COUNT + " PERSONS ===");
 
-            for (int i = 0; i < BATCH_COUNT; i++) {
+            for (int i = 0; i < GEN_COUNT; i++) {
                 Person p = randomPerson();
                 long addr = heapFile.insert(p);
-                view.append("Inserted: " + p + " @addr=" + addr);
+                view.append("Inserted: " + p + " on addr=" + addr);
             }
 
             view.append("=== DONE ===\n");
 
         } catch (Exception e) {
-            error("Batch generation failed", e);
+            error("Data generation failed", e);
         }
     }
 
-    // ---- Print entire heap ----
     public void onPrint() {
         try {
             view.append("\n===== HEAPFILE CONTENT =====");
-            String dump = heapFile.printToString();
+            String dump = heapFile.print();
             view.append(dump);
         } catch (Exception e) {
             error("Print failed", e);
         }
     }
 
-    // ---- Close file ----
     public void onClose() {
         try {
             heapFile.close();
@@ -123,7 +119,6 @@ public class HeapFilePresenter {
         }
     }
 
-    // ---- Error handler ----
     private void error(String msg, Exception e) {
         e.printStackTrace();
         view.append("ERROR: " + e.getMessage());
@@ -131,8 +126,7 @@ public class HeapFilePresenter {
                 "Error", JOptionPane.ERROR_MESSAGE);
     }
 
-    // ---- Random person generator ----
-    private int idCounter = 0;
+
 
     private String randomString(Random rnd, int length) {
         String chars = "abcdefghijklmnopqrstuvwxyz";
@@ -142,7 +136,6 @@ public class HeapFilePresenter {
             sb.append(chars.charAt(rnd.nextInt(chars.length())));
         }
 
-        // Prvé písmeno veľké (ako meno)
         sb.setCharAt(0, Character.toUpperCase(sb.charAt(0)));
 
         return sb.toString();
@@ -154,7 +147,6 @@ public class HeapFilePresenter {
         String name = randomString(rnd, 6);
         String surname = randomString(rnd, 8);
 
-        // sekvenčné ID
         String id = "ID" + (idCounter++);
 
         int year = 1980 + rnd.nextInt(30);

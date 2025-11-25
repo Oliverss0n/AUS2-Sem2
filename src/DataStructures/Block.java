@@ -5,20 +5,20 @@ import java.util.ArrayList;
 
 public class Block<T extends IRecord<T>> {
 
-    private ArrayList<T> list;      // vždy veľkosť blockFactor
-    private int validCount;         // počet platných záznamov
+    private ArrayList<T> list;
+    private int validCount;
     private int blockFactor;
-    private T prototype;            // len kvôli getSize()
+    private T prototype; //kvôli getSize
 
     public Block(int blockFactor, T prototype, ArrayList<T> emptyList) {
         this.blockFactor = blockFactor;
         this.prototype = prototype;
-        this.list = emptyList;     // prázdne T (vytvorené DALEKO MIMO)
+        this.list = emptyList;
         this.validCount = 0;
     }
 
     public int getValidCount() {
-        return validCount;
+        return this.validCount;
     }
 
     public void setValidCount(int validCount) {
@@ -29,42 +29,38 @@ public class Block<T extends IRecord<T>> {
         return list;
     }
 
-    public int getBlockSize() {
-        return blockFactor * prototype.getSize() + 4; // 4B = validCount
-    }
-
-    // ===================================================
-    // SERIALIZÁCIA BLOKU DO BAJTOV
-    // ===================================================
     public ArrayList<Byte> getBytes() {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         DataOutputStream dos = new DataOutputStream(bos);
 
         try {
-            // 1) Zapíš všetky T (aj neplatné)
-            for (int i = 0; i < blockFactor; i++) {
-                ArrayList<Byte> rec = list.get(i).getBytes();
-                for (byte b : rec) dos.writeByte(b);
+            for (int i = 0; i < this.blockFactor; i++) {
+
+                ArrayList<Byte> recordBytes = list.get(i).getBytes();
+
+                for (byte byteVal : recordBytes) {
+                    dos.writeByte(byteVal);
+                }
             }
 
-            // 2) Zapíš validCount — jednoducho!
-            dos.writeInt(validCount);
-            dos.flush();
+            dos.writeInt(this.validCount);
 
         } catch (IOException e) {
-            throw new RuntimeException("Error serializing block", e);
+            throw new RuntimeException(e);
         }
 
-        // Konverzia na ArrayList<Byte>
-        byte[] raw = bos.toByteArray();
-        ArrayList<Byte> out = new ArrayList<>(raw.length);
-        for (byte b : raw) out.add(b);
-        return out;
+        byte[] blockBytes = bos.toByteArray();
+
+        ArrayList<Byte> result = new ArrayList<>(blockBytes.length);
+        for (byte byteVal : blockBytes) {
+            result.add(byteVal);
+        }
+
+        return result;
     }
 
-    // ===================================================
-    // DESERIALIZÁCIA BLOKU — BEZ POSUNOV !!
-    // ===================================================
+
+
     public void fromBytes(ArrayList<Byte> bytes) {
         byte[] raw = new byte[bytes.size()];
         for (int i = 0; i < bytes.size(); i++) raw[i] = bytes.get(i);
@@ -75,11 +71,10 @@ public class Block<T extends IRecord<T>> {
         try {
             int recSize = prototype.getSize();
 
-            // 1) načítaj všetky T
             for (int i = 0; i < blockFactor; i++) {
 
                 byte[] slice = new byte[recSize];
-                dis.readFully(slice); // načítaj presne recSize bajtov
+                dis.readFully(slice);
 
                 ArrayList<Byte> arr = new ArrayList<>(recSize);
                 for (byte b : slice) arr.add(b);
@@ -87,11 +82,10 @@ public class Block<T extends IRecord<T>> {
                 list.get(i).fromBytes(arr);
             }
 
-            // 2) načítaj validCount
             this.validCount = dis.readInt();
 
         } catch (IOException e) {
-            throw new RuntimeException("Error reading block", e);
+            throw new RuntimeException("chyba v fromBytes", e);
         }
     }
 
