@@ -51,6 +51,7 @@ public class HeapFile<T extends IRecord<T>> {
         long addr;
 
         if (!partialBlocks.isEmpty()) {
+            Collections.sort(partialBlocks);
             addr = partialBlocks.get(0);
 
             Block<T> block = readBlock(addr);
@@ -67,6 +68,7 @@ public class HeapFile<T extends IRecord<T>> {
         }
 
         if (!freeBlocks.isEmpty()) {
+            Collections.sort(freeBlocks);
             addr = freeBlocks.remove(0);
 
             Block<T> block = emptyBlock();
@@ -127,6 +129,7 @@ public class HeapFile<T extends IRecord<T>> {
 
         if (block.getValidCount() == 0) {
             handleEmptyBlock(addr);
+            return true;
         }
 
         else if (!partialBlocks.contains(addr)){

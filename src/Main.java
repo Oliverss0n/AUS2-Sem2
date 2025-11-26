@@ -10,7 +10,7 @@ public class Main {
 
     public static void main(String[] args) {
 
-        deleteOldFiles();
+        deleteFiles();
 
         HeapFile<Person> sharedHF = null;
 
@@ -40,7 +40,7 @@ public class Main {
         });
     }
 
-    private static void deleteOldFiles() {
+    private static void deleteFiles() {
         try { new File("data.bin").delete(); } catch (Exception ignored) { }
         try { new File("data.bin.meta").delete(); } catch (Exception ignored) { }
     }
@@ -48,7 +48,10 @@ public class Main {
     private static HeapFile<Person> runTest() {
         try {
             HeapFile<Person> hf = new HeapFile<>("data.bin", 256, new Person());
-            Tester.runHeapFileTest(hf, 1000, 500, 400,10);
+
+            Tester.mixedHeapTest(hf, 1000, 60, 20, 20, 10);
+
+
             return hf;
         } catch (Exception e) {
             e.printStackTrace();
