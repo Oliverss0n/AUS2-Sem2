@@ -164,7 +164,7 @@ public class HeapFile<T extends IRecord<T>> {
     }
 
 
-    private void shrinkFile() throws Exception {
+    public void shrinkFile() throws Exception {
         Collections.sort(freeBlocks);
 
         long newSize = raf.length();
