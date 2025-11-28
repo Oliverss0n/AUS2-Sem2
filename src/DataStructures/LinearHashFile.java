@@ -170,8 +170,10 @@ public class LinearHashFile<T extends IRecord<T>> {
             Block<T> ov = overflowFile.readBlock(nextAddr);
 
             for (int i = 0; i < ov.getValidCount(); i++) {
-                T r = ov.getList().get(i);
-                if (r.isEqual(data)) return r;
+                T rec = ov.getList().get(i);
+                if (rec.isEqual(data)) {
+                    return rec;
+                }
             }
 
             nextAddr = ov.getNext();
@@ -179,6 +181,129 @@ public class LinearHashFile<T extends IRecord<T>> {
 
         return null;
     }
+
+    public boolean update(T pattern, T newRecord) throws Exception {
+
+        int key = pattern.getHashCode();
+        int index = getIndex(key);
+
+        long primaryAddr = (long) index * mainFile.getBlockSize();
+        Block<T> primary = mainFile.readBlock(primaryAddr);
+
+        // 1) UPDATE v PRIMÁRNOM BLOKU
+        if (updateFromBlock(mainFile, primaryAddr, primary, pattern, newRecord)) {
+            return true;
+        }
+
+        // 2) UPDATE v OVERFLOW BLOKOCH
+        long nextAddr = primary.getNext();
+
+        while (nextAddr != 0) {
+
+            Block<T> ov = overflowFile.readBlock(nextAddr);
+
+            if (updateFromBlock(overflowFile, nextAddr, ov, pattern, newRecord)) {
+                return true;
+            }
+
+            nextAddr = ov.getNext();
+        }
+
+        return false;
+    }
+
+
+    public boolean delete(T pattern) throws Exception {
+
+        int key = pattern.getHashCode();
+        int index = getIndex(key);
+
+        long primaryAddr = (long) index * mainFile.getBlockSize();
+        Block<T> primary = mainFile.readBlock(primaryAddr);
+
+        // ==================================================
+        // 1) POKUS O MAZANIE V PRIMÁRNOM BLOKU
+        // ==================================================
+        if (deleteFromBlock(mainFile, primaryAddr, primary, pattern)) {
+
+            totalRecords--;
+            recordCountPerIndex[index]--;
+
+            if (getDensity() < d_min) merge();
+            return true;
+        }
+
+        // ==================================================
+        // 2) HĽADANIE V OVERFLOW REŤAZCI
+        // ==================================================
+        long nextAddr = primary.getNext();
+
+        while (nextAddr != 0) {
+
+            Block<T> ov = overflowFile.readBlock(nextAddr);
+
+            if (deleteFromBlock(overflowFile, nextAddr, ov, pattern)) {
+
+                totalRecords--;
+                overflowChainLength[index]--;
+
+                if (getDensity() < d_min) merge();
+                return true;
+            }
+
+            nextAddr = ov.getNext();
+        }
+
+        return false;
+    }
+
+    //pomocna metoda kvoli duplicite
+    private boolean deleteFromBlock(HeapFile<T> file, long addr, Block<T> block, T data) throws Exception {
+
+        for (int i = 0; i < block.getValidCount(); i++) {
+
+            T r = block.getList().get(i);
+
+            if (r.isEqual(data)) {
+
+                // shift left
+                for (int j = i + 1; j < block.getValidCount(); j++) {
+                    block.getList().set(j - 1, block.getList().get(j));
+                }
+
+                block.setValidCount(block.getValidCount() - 1);
+
+                file.writeBlock(addr, block);
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean updateFromBlock(HeapFile<T> file, long addr, Block<T> block,
+                                    T pattern, T newRecord) throws Exception {
+
+        for (int i = 0; i < block.getValidCount(); i++) {
+
+            T r = block.getList().get(i);
+
+            if (r.isEqual(pattern)) {
+
+                block.getList().set(i, newRecord);
+
+                file.writeBlock(addr, block);
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
+
 
     private int getIndex(int key) {
 
@@ -260,7 +385,90 @@ public class LinearHashFile<T extends IRecord<T>> {
             u++;
         }
     }
+
+    private void merge() throws Exception {
+
+        int groupsBefore = M * (int) Math.pow(2, u);
+
+        // =======================
+        // PRÍPAD A) S > 0
+        // =======================
+        if (S > 0) {
+
+            int lastIndex = S + groupsBefore - 1;
+            int targetIndex = S - 1;
+
+            mergeGroups(lastIndex, targetIndex);
+
+            S--;
+            return;
+        }
+
+        // =======================
+        // PRÍPAD B) S == 0 a u > 0
+        // =======================
+        if (u > 0) {
+
+            int lastIndex = groupsBefore - 1;
+
+            u--; // znížime úroveň
+            int groupsNow = M * (int) Math.pow(2, u);
+
+            int targetIndex = groupsNow - 1;
+
+            mergeGroups(lastIndex, targetIndex);
+
+            S = targetIndex;  // reset S na koniec
+        }
+    }
+
+    private void mergeGroups(int fromIndex, int toIndex) throws Exception {
+
+        long fromAddr = (long) fromIndex * mainFile.getBlockSize();
+        long toAddr   = (long) toIndex   * mainFile.getBlockSize();
+
+        Block<T> from = mainFile.readBlock(fromAddr);
+        Block<T> to   = mainFile.readBlock(toAddr);
+
+        // presuň reálne záznamy z from → to
+        for (int i = 0; i < from.getValidCount(); i++) {
+
+            T record = from.getList().get(i);
+
+            if (to.getValidCount() < mainFile.getBlockFactor()) {
+
+                // zmestí sa do primárneho bloku
+                to.getList().set(to.getValidCount(), record);
+                to.setValidCount(to.getValidCount() + 1);
+            }
+            else {
+                // vlož do overflow reťazca toIndex
+                insertIntoOverflow(toIndex, record);
+            }
+        }
+
+        // zapíš upravený blok target
+        mainFile.writeBlock(toAddr, to);
+
+        // clear from-block
+        Block<T> empty = mainFile.createEmptyBlock();
+        mainFile.writeBlock(fromAddr, empty);
+
+        // štatistiky
+        recordCountPerIndex[toIndex] = to.getValidCount();
+        recordCountPerIndex[fromIndex] = 0;
+    }
+
+
+
+
+
+
+
+
 }
+
+
 
 
 
