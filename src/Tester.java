@@ -68,7 +68,7 @@ public class Tester {
         int blockSize = hf.getBlockSize();
 
         for (long addr = 0; addr + blockSize <= fileLength; addr += blockSize) {
-            var block = hf.readBlockForTest(addr);
+            var block = hf.readBlock(addr);
             for (int i = 0; i < block.getValidCount(); i++)
                 actual.add(block.getList().get(i));
         }

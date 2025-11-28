@@ -149,7 +149,7 @@ public class Person implements IRecord<Person> {
 
     @Override
     public int getHashCode() {
-        return id.hashCode();
+        return Math.abs(id.hashCode()); //este preymsliet
     }
 
 }

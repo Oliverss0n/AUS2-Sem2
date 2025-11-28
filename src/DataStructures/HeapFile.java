@@ -184,7 +184,7 @@ public class HeapFile<T extends IRecord<T>> {
         raf.setLength(newSize);
     }
 
-    private Block<T> readBlock(long addr) throws Exception {
+    public Block<T> readBlock(long addr) throws Exception {
         byte[] buf = new byte[this.blockSize];
 
         raf.seek(addr);
@@ -200,7 +200,7 @@ public class HeapFile<T extends IRecord<T>> {
         return block;
     }
 
-    private void writeBlock(long addr, Block<T> block) throws Exception {
+    public void writeBlock(long addr, Block<T> block) throws Exception {
         ArrayList<Byte> arr = block.getBytes();
 
         while (arr.size() < this.blockSize) {
@@ -307,6 +307,12 @@ public class HeapFile<T extends IRecord<T>> {
     }
 
 
+    public long writeNewBlock(Block<T> block) throws Exception {
+        long addr = raf.length();  // koniec súboru
+        writeBlockDirect(addr, block);
+        return addr;
+    }
+
 
     public long getFileLength() throws Exception {
         return raf.length();
@@ -314,20 +320,19 @@ public class HeapFile<T extends IRecord<T>> {
     public int getBlockSize() {
         return blockSize;
     }
-    public Block<T> readBlockForTest(long addr) throws Exception {
-        return readBlock(addr);
-    }
+
 
     public void writeBlockForTest(long addr, Block<T> block) throws Exception {
         writeBlock(addr, block);
     }
 
-    public int getBlockFactor() {
-        return blockFactor;
-    }
+
 
     public void writeBlockDirect(long offset, Block<T> b) throws Exception {
         writeBlock(offset, b);
+    }
+    public int getBlockFactor() {
+        return blockFactor;
     }
 
 }
