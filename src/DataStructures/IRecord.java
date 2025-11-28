@@ -10,4 +10,6 @@ public interface IRecord<T> {
 
     void fromBytes(ArrayList<Byte> byteArray);
 
+    int getHashCode();
+
 }

@@ -10,6 +10,9 @@ public class Block<T extends IRecord<T>> {
     private int blockFactor;
     private T prototype;
 
+    private long next;
+
+
     public Block(int blockFactor, T prototype, ArrayList<T> emptyList) {
         this.blockFactor = blockFactor;
         this.prototype = prototype;
@@ -88,6 +91,10 @@ public class Block<T extends IRecord<T>> {
             throw new RuntimeException("chyba v fromBytes", e);
         }
     }
+
+    public long getNext() { return next; }
+    public void setNext(long n) { next = n; }
+
 
     @Override
     public String toString() {

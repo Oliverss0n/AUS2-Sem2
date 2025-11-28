@@ -46,6 +46,11 @@ public class HeapFile<T extends IRecord<T>> {
         return new Block<>(blockFactor, prototype, list);
     }
 
+    public Block<T> createEmptyBlock() {
+        return emptyBlock();
+    }
+
+
     public long insert(T data) throws Exception {
 
         long addr;
@@ -313,7 +318,16 @@ public class HeapFile<T extends IRecord<T>> {
         return readBlock(addr);
     }
 
+    public void writeBlockForTest(long addr, Block<T> block) throws Exception {
+        writeBlock(addr, block);
+    }
+
     public int getBlockFactor() {
         return blockFactor;
     }
+
+    public void writeBlockDirect(long offset, Block<T> b) throws Exception {
+        writeBlock(offset, b);
+    }
+
 }

@@ -41,10 +41,11 @@ public class Person implements IRecord<Person> {
 
     @Override
     public int getSize() {
-        return NAME_LEN + SURNAME_LEN + ID_LEN + 12;
+        // 15 + 1 + 14 + 1 + 10 + 1 + 12 = 54
+        return NAME_LEN + 1 + SURNAME_LEN + 1 + ID_LEN + 1 + 12;
     }
 
-    //zapisanie
+    // zapisanie
     @Override
     public ArrayList<Byte> getBytes() {
 
@@ -53,13 +54,19 @@ public class Person implements IRecord<Person> {
             DataOutputStream dos = new DataOutputStream(baos);
 
             // NAME
-            dos.write(pad(this.name.getBytes(), NAME_LEN));
+            byte[] nameBytes = this.name.getBytes();
+            dos.write(pad(nameBytes, NAME_LEN));
+            dos.writeByte(Math.min(nameBytes.length, NAME_LEN));
 
             // SURNAME
-            dos.write(pad(this.surname.getBytes(), SURNAME_LEN));
+            byte[] surBytes = this.surname.getBytes();
+            dos.write(pad(surBytes, SURNAME_LEN));
+            dos.writeByte(Math.min(surBytes.length, SURNAME_LEN));
 
             // ID
-            dos.write(pad(this.id.getBytes(), ID_LEN));
+            byte[] idBytes = this.id.getBytes();
+            dos.write(pad(idBytes, ID_LEN));
+            dos.writeByte(Math.min(idBytes.length, ID_LEN));
 
             // DATE
             dos.writeInt(this.year);
@@ -68,9 +75,8 @@ public class Person implements IRecord<Person> {
 
             byte[] arr = baos.toByteArray();
             ArrayList<Byte> out = new ArrayList<>(arr.length);
-            for (byte b : arr) {
-                out.add(b);
-            }
+            for (byte b : arr) out.add(b);
+
             return out;
 
         } catch (IOException e) {
@@ -78,15 +84,14 @@ public class Person implements IRecord<Person> {
         }
     }
 
-    //nacitanie
+    // nacitanie
     @Override
     public void fromBytes(ArrayList<Byte> a) {
 
         try {
             byte[] arr = new byte[a.size()];
-            for (int i = 0; i < a.size(); i++) {
+            for (int i = 0; i < a.size(); i++)
                 arr[i] = a.get(i);
-            }
 
             DataInputStream dis = new DataInputStream(new ByteArrayInputStream(arr));
 
@@ -95,17 +100,20 @@ public class Person implements IRecord<Person> {
             // NAME
             tmp = new byte[NAME_LEN];
             dis.readFully(tmp);
-            name = new String(tmp).trim();
+            int nameReal = dis.readUnsignedByte();
+            this.name = new String(tmp, 0, nameReal);
 
             // SURNAME
             tmp = new byte[SURNAME_LEN];
             dis.readFully(tmp);
-            this.surname = new String(tmp).trim();
+            int surReal = dis.readUnsignedByte();
+            this.surname = new String(tmp, 0, surReal);
 
             // ID
             tmp = new byte[ID_LEN];
             dis.readFully(tmp);
-            this.id = new String(tmp).trim();
+            int idReal = dis.readUnsignedByte();
+            this.id = new String(tmp, 0, idReal);
 
             // DATE
             this.year = dis.readInt();
@@ -120,11 +128,7 @@ public class Person implements IRecord<Person> {
     private byte[] pad(byte[] before, int length) {
         byte[] out = new byte[length];
         for (int i = 0; i < length; i++) {
-            if (i < before.length) {
-                out[i] = before[i];
-            } else {
-                out[i] = 0;
-            }
+            out[i] = (i < before.length) ? before[i] : 0;
         }
         return out;
     }
@@ -137,9 +141,15 @@ public class Person implements IRecord<Person> {
         return this.id;
     }
 
-
     @Override
     public String toString() {
-        return this.name + " " + this.surname + " " + this.id + " (" + this.year + "-" + this.month + "-" + this.day + ")";
+        return this.name + " " + this.surname + " " + this.id +
+                " (" + this.year + "-" + this.month + "-" + this.day + ")";
     }
+
+    @Override
+    public int getHashCode() {
+        return id.hashCode();
+    }
+
 }
