@@ -38,13 +38,14 @@ public class LinearHashFile<T extends IRecord<T>> {
 
         this.metadataPath = mainPath + ".lh.meta";
 
-        int max = M * (1 << 10);
+        int max = M * 1024;
         this.recordCountPerIndex = new int[max];
         this.overflowChainLength = new int[max];
 
         this.mainFile = new HeapFile<>(mainPath, mainBlockSize, prototype);
         this.overflowFile = new HeapFile<>(overflowPath, overflowBlockSize, prototype);
 
+        loadMetadata();
         if (mainFile.getFileLength() == 0) {
             createPrimaryBlocks();
         }
@@ -340,6 +341,7 @@ public class LinearHashFile<T extends IRecord<T>> {
         return (double) totalRecords / totalCapacity;
     }
 
+
     private void split() throws Exception {
 
         int oldIndex = S;
@@ -476,7 +478,7 @@ public class LinearHashFile<T extends IRecord<T>> {
 
         // overíme, či je emptyAddr posledný v súbore
         long lastBlockAddr = overflowFile.getFileLength() - overflowFile.getBlockSize();
-        if (emptyAddr != lastBlockAddr) return; // nie je posledný → nestriasame
+        if (emptyAddr != lastBlockAddr) return;
 
         // MUSÍME odpojiť predchádzajúci blok
         if (prevAddr == 0) {
@@ -503,6 +505,171 @@ public class LinearHashFile<T extends IRecord<T>> {
 
 
 
+    private int getCurrentGroups() {
+        return S + M * (int)Math.pow(2, u);
+    }
+
+    public int getM() {
+        return M;
+    }
+
+    public int getU() {
+        return u;
+    }
+
+    public int getS() {
+        return S;
+    }
+
+    public HeapFile<T> getMainFile() {
+        return mainFile;
+    }
+
+    public HeapFile<T> getOverflowFile() {
+        return overflowFile;
+    }
+
+    private void saveMetadata() throws Exception {
+
+        PrintWriter pw = new PrintWriter(metadataPath);
+
+        // základné parametre LH
+        pw.println(M);
+        pw.println(u);
+        pw.println(S);
+        pw.println(d_max);
+        pw.println(d_min);
+        pw.println(totalRecords);
+
+        // počet aktuálnych skupín
+        int groups = getCurrentGroups();
+        pw.println(groups);
+
+        // recordCountPerIndex
+        for (int i = 0; i < groups; i++) {
+            pw.println(recordCountPerIndex[i]);
+        }
+
+        // overflowChainLength
+        for (int i = 0; i < groups; i++) {
+            pw.println(overflowChainLength[i]);
+        }
+
+        pw.close();
+    }
+
+
+    private void loadMetadata() throws Exception {
+
+        File f = new File(metadataPath);
+        if (!f.exists()) return;
+
+        Scanner sc = new Scanner(f);
+
+        M = Integer.parseInt(sc.nextLine());
+        u = Integer.parseInt(sc.nextLine());
+        S = Integer.parseInt(sc.nextLine());
+        d_max = Double.parseDouble(sc.nextLine());
+        d_min = Double.parseDouble(sc.nextLine());
+        totalRecords = Integer.parseInt(sc.nextLine());
+
+        // počet skupín keď sa LH predtým zatváral
+        int groups = Integer.parseInt(sc.nextLine());
+
+        // recordCountPerIndex
+        for (int i = 0; i < groups; i++) {
+            recordCountPerIndex[i] = Integer.parseInt(sc.nextLine());
+        }
+
+        // overflowChainLength
+        for (int i = 0; i < groups; i++) {
+            overflowChainLength[i] = Integer.parseInt(sc.nextLine());
+        }
+
+        sc.close();
+    }
+
+    public void close() throws Exception {
+        saveMetadata();
+        mainFile.close();
+        overflowFile.close();
+    }
+
+    public String print() {
+        StringBuilder sb = new StringBuilder();
+
+        try {
+
+            sb.append("=========== LINEAR HASH FILE ===========\n");
+            sb.append("M = ").append(M)
+                    .append(", u = ").append(u)
+                    .append(", S = ").append(S).append("\n");
+            sb.append("totalRecords = ").append(totalRecords).append("\n");
+            sb.append("density = ").append(String.format("%.4f", getDensity())).append("\n");
+
+            int currentGroups = S + M * (int)Math.pow(2, u);
+            sb.append("current primary groups = ").append(currentGroups).append("\n\n");
+
+            // ======================================
+            // 1) PRIMÁRNE BLOKY
+            // ======================================
+            sb.append("----- PRIMARY BLOCKS -----\n");
+
+            long blockSize = mainFile.getBlockSize();
+
+            for (int i = 0; i < currentGroups; i++) {
+
+                long addr = (long) i * blockSize;
+                Block<T> block = mainFile.readBlock(addr);
+
+                sb.append("Index ").append(i)
+                        .append(" @addr=").append(addr)
+                        .append("  valid=").append(block.getValidCount())
+                        .append("  next=").append(block.getNext())
+                        .append("\n");
+
+                for (int j = 0; j < block.getValidCount(); j++) {
+                    sb.append("    ").append(block.getList().get(j)).append("\n");
+                }
+            }
+
+            sb.append("\n");
+
+            // ======================================
+            // 2) OVERFLOW BLOKY
+            // ======================================
+            sb.append("----- OVERFLOW BLOCKS -----\n");
+
+            long fileLen = overflowFile.getFileLength();
+            long oBlockSize = overflowFile.getBlockSize();
+
+            if (fileLen == 0) {
+                sb.append("(no overflow blocks)\n");
+                return sb.toString();
+            }
+
+            for (long addr = 0; addr + oBlockSize <= fileLen; addr += oBlockSize) {
+
+                Block<T> ov = overflowFile.readBlock(addr);
+
+                sb.append("Overflow @addr=").append(addr)
+                        .append("  valid=").append(ov.getValidCount())
+                        .append("  next=").append(ov.getNext())
+                        .append("\n");
+
+                for (int j = 0; j < ov.getValidCount(); j++) {
+                    sb.append("    ").append(ov.getList().get(j)).append("\n");
+                }
+            }
+
+            sb.append("=========================================\n");
+
+        } catch (Exception e) {
+            sb.append("ERROR IN PRINT: ").append(e.getMessage()).append("\n");
+        }
+
+        return sb.toString();
+    }
 
 
 

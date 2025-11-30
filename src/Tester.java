@@ -1,4 +1,6 @@
+import DataStructures.Block;
 import DataStructures.HeapFile;
+import DataStructures.LinearHashFile;
 import Model.Person;
 
 import java.util.ArrayList;
@@ -88,6 +90,166 @@ public class Tester {
                 throw new RuntimeException("MISSING RECORD: " + p.getId());
         }
     }
+
+
+
+    public static void mixedLinearHashTest(LinearHashFile<Person> lhf,
+                                           int operations,
+                                           int insertPercent,
+                                           int deletePercent,
+                                           int findPercent,
+                                           int checkInterval) throws Exception {
+
+        ArrayList<Person> model = new ArrayList<>();
+
+        for (int op = 1; op <= operations; op++) {
+
+            int choice = rnd.nextInt(100);
+
+            // ========================================
+            // INSERT
+            // ========================================
+            if (choice < insertPercent) {
+
+                Person p = randomPerson();
+                lhf.insert(p);
+                model.add(p);
+            }
+
+            // ========================================
+            // DELETE
+            // ========================================
+            else if (choice < insertPercent + deletePercent) {
+
+                if (!model.isEmpty()) {
+                    int idx = rnd.nextInt(model.size());
+                    Person p = model.get(idx);
+
+                    lhf.delete(p);       // delete by pattern
+                    model.remove(idx);   // remove from reference model
+                }
+            }
+
+            // ========================================
+            // FIND
+            // ========================================
+            else {
+
+                if (!model.isEmpty()) {
+                    int idx = rnd.nextInt(model.size());
+                    Person expected = model.get(idx);
+
+                    Person found = lhf.find(expected);
+
+                    if (found == null || !found.isEqual(expected)) {
+                        throw new RuntimeException("FIND ERROR: expected=" + expected.getId());
+                    }
+                }
+            }
+
+            // ========================================
+            // VALIDATE PERIODICALLY
+            // ========================================
+            if (op % checkInterval == 0) {
+                validateWholeLinearHash(lhf, model);
+            }
+        }
+
+        // final validation
+        validateWholeLinearHash(lhf, model);
+    }
+
+    private static void validateWholeLinearHash(LinearHashFile<Person> lhf,
+                                                ArrayList<Person> expected) throws Exception {
+
+        ArrayList<Person> actual = new ArrayList<>();
+
+        int groups = lhf.getS() + lhf.getM() * (int)Math.pow(2, lhf.getU());
+        int blockSize = lhf.getMainFile().getBlockSize();
+
+        // ==========================================
+        // ČÍTANIE PRIMÁRNYCH BLOKOV
+        // ==========================================
+        for (int i = 0; i < groups; i++) {
+
+            long addr = (long) i * blockSize;
+            Block<Person> block = lhf.getMainFile().readBlock(addr);
+
+            for (int j = 0; j < block.getValidCount(); j++) {
+                actual.add(block.getList().get(j));
+            }
+
+            // ==========================================
+            // ČÍTANIE OVERFLOW REŤAZCA
+            // ==========================================
+            long next = block.getNext();
+            while (next != 0) {
+                Block<Person> ov = lhf.getOverflowFile().readBlock(next);
+                for (int j = 0; j < ov.getValidCount(); j++) {
+                    actual.add(ov.getList().get(j));
+                }
+                next = ov.getNext();
+            }
+        }
+
+        // ==========================================
+        // POROVNANIE
+        // ==========================================
+        if (actual.size() != expected.size())
+            throw new RuntimeException("COUNT ERROR: expected=" + expected.size() + " actual=" + actual.size());
+
+        for (Person p : expected) {
+            boolean ok = false;
+            for (Person a : actual) {
+                if (a.isEqual(p)) {
+                    ok = true;
+                    break;
+                }
+            }
+            if (!ok) {
+                throw new RuntimeException("MISSING RECORD: " + p.getId());
+            }
+        }
+    }
+
+
+    public static void simpleInsertFindTest(LinearHashFile<Person> lhf,
+                                            int inserts,
+                                            int checks) throws Exception {
+
+        ArrayList<Person> model = new ArrayList<>();
+
+        // ==========================================
+        // INSERT TEST
+        // ==========================================
+        for (int i = 0; i < inserts; i++) {
+            Person p = randomPerson();
+            lhf.insert(p);
+            model.add(p);
+        }
+
+        System.out.println("INSERT DONE, inserted = " + inserts);
+        System.out.println(lhf.print());   // ← pridaj toto
+
+
+        // ==========================================
+        // FIND TEST
+        // ==========================================
+        for (int i = 0; i < checks; i++) {
+
+            Person expected = model.get(rnd.nextInt(model.size()));
+            Person found = lhf.find(expected);
+
+            if (found == null || !found.isEqual(expected)) {
+                throw new RuntimeException(
+                        "FIND ERROR: expected = " + expected.getId()
+                );
+            }
+        }
+
+        System.out.println("FIND OK (" + checks + " random finds)");
+    }
+
 
 
     private static Person randomPerson() {

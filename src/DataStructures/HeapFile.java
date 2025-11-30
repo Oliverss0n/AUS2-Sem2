@@ -183,7 +183,7 @@ public class HeapFile<T extends IRecord<T>> {
 
         raf.setLength(newSize);
     }
-
+/*
     public Block<T> readBlock(long addr) throws Exception {
         byte[] buf = new byte[this.blockSize];
 
@@ -198,8 +198,39 @@ public class HeapFile<T extends IRecord<T>> {
         Block<T> block = emptyBlock();
         block.fromBytes(list);
         return block;
+    }*/
+public Block<T> readBlock(long addr) throws Exception {
+
+    raf.seek(addr);
+    byte[] raw = new byte[blockSize];
+    raf.read(raw);
+
+    DataInputStream dis = new DataInputStream(new ByteArrayInputStream(raw));
+
+    Block<T> block = emptyBlock();
+
+    // 1) read validCount
+    block.setValidCount(dis.readInt());
+
+    // 2) read next pointer
+    block.setNext(dis.readLong());
+
+    // 3) read all T records
+    for (int i = 0; i < blockFactor; i++) {
+        ArrayList<Byte> bytes = new ArrayList<>();
+        for (int j = 0; j < prototype.getSize(); j++) {
+            bytes.add(dis.readByte());
+        }
+        T rec = (T) prototype.getClass().newInstance();
+        rec.fromBytes(bytes);
+        block.getList().set(i, rec);
     }
 
+    return block;
+}
+
+
+    /*
     public void writeBlock(long addr, Block<T> block) throws Exception {
         ArrayList<Byte> arr = block.getBytes();
 
@@ -214,7 +245,40 @@ public class HeapFile<T extends IRecord<T>> {
 
         raf.seek(addr);
         raf.write(raw);
+    } */
+
+    public void writeBlock(long addr, Block<T> block) throws Exception {
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+
+        // 1) write valid count
+        dos.writeInt(block.getValidCount());
+
+        // 2) write next pointer
+        dos.writeLong(block.getNext());
+
+        // 3) write all T records
+        for (int i = 0; i < blockFactor; i++) {
+            T rec = block.getList().get(i);
+            ArrayList<Byte> bytes = rec.getBytes();
+            for (byte b : bytes) {
+                dos.writeByte(b);
+            }
+        }
+
+        byte[] raw = baos.toByteArray();
+
+        // pad to full blockSize
+        while (raw.length < blockSize) {
+            baos.write(0);
+            raw = baos.toByteArray();
+        }
+
+        raf.seek(addr);
+        raf.write(raw);
     }
+
 
 
     //este neotestovane, len napad na implementaciu
