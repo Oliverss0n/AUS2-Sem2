@@ -34,6 +34,7 @@ public class HeapFile<T extends IRecord<T>> {
     }
 
 
+    /*
     private Block<T> emptyBlock() {
         ArrayList<T> list = new ArrayList<>(blockFactor);
         for (int i = 0; i < blockFactor; i++) {
@@ -44,7 +45,23 @@ public class HeapFile<T extends IRecord<T>> {
             }
         }
         return new Block<>(blockFactor, prototype, list);
+    }*/
+
+    private Block<T> emptyBlock() {
+        ArrayList<T> list = new ArrayList<>(blockFactor);
+        for (int i = 0; i < blockFactor; i++) {
+            try {
+                list.add((T) prototype.getClass().newInstance());
+            } catch (Exception e) {
+                throw new RuntimeException("Trieda musi mat prazdny konstruktor", e);
+            }
+        }
+        Block<T> block = new Block<>(blockFactor, prototype, list);
+        block.setValidCount(0);
+        block.setNext(-1);          // 👈 DOPLŇ TOTO
+        return block;
     }
+
 
     public Block<T> createEmptyBlock() {
         return emptyBlock();
@@ -229,6 +246,7 @@ public Block<T> readBlock(long addr) throws Exception {
         raf.write(raw);
     } */
 
+
     public void writeBlock(long addr, Block<T> block) throws Exception {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -352,13 +370,18 @@ public Block<T> readBlock(long addr) throws Exception {
         return sb.toString();
     }
 
-
+/*
     public long writeNewBlock(Block<T> block) throws Exception {
         // ✅ VŽDY pridaj na koniec súboru, IGNORUJ freeBlocks
         long addr = raf.length();
         writeBlock(addr, block);
         return addr;
-    }
+    }*/
+public long writeNewBlock(Block<T> block) throws Exception {
+    long addr = raf.length();
+    writeBlock(addr, block);
+    return addr;
+}
 
 
     public long getFileLength() throws Exception {
@@ -409,7 +432,6 @@ public Block<T> readBlock(long addr) throws Exception {
 
     public void shrinkFileCompletely() throws Exception {
         long fileLen = raf.length();
-
         if (fileLen == 0) return;
 
         // Prechádzaj od konca a škrtaj prázdne bloky
@@ -431,9 +453,15 @@ public Block<T> readBlock(long addr) throws Exception {
         // Nastav novú dĺžku súboru
         raf.setLength(fileLen);
 
-        // ✅ Vyčisti freeBlocks - vytvor final premennú pre lambdu
-        final long newLength = fileLen;
-        freeBlocks.removeIf(addr -> addr >= newLength);
+        // Vyčisti freeBlocks - odstráň adresy >= novej dĺžky
+        int i = 0;
+        while (i < freeBlocks.size()) {
+            if (freeBlocks.get(i) >= fileLen) {
+                freeBlocks.remove(i);
+            } else {
+                i++;
+            }
+        }
     }
 
     public void writeBlockDirect(long offset, Block<T> b) throws Exception {

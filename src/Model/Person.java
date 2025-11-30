@@ -147,16 +147,12 @@ public class Person implements IRecord<Person> {
                 " (" + this.year + "-" + this.month + "-" + this.day + ")";
     }
 
-    /*
-    @Override
-    public int getHashCode() {
-        return Math.abs(id.hashCode()); //este preymsliet
-    }*/
 
     @Override
     public int getHashCode() {
-        return id.hashCode() & 0x7fffffff;  // odmaskuje horný bit
+        return Math.abs(id.hashCode());
     }
+
 
 
 }

@@ -84,7 +84,7 @@ public class Main {
                 if (USE_TESTER) {
                     Tester.simpleInsertFindTest(
                             lhf,
-                            100, 50
+                            100, 10000
                     );
                 }
 
