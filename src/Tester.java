@@ -242,7 +242,7 @@ public class Tester {
 
             if (found == null || !found.isEqual(expected)) {
                 throw new RuntimeException(
-                        "FIND ERROR: expected = " + expected.getId()
+                        "FIND ERROR: expected = " + expected.getId() + " found = " + (found != null ? found.getId() : "null")
                 );
             }
         }

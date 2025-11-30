@@ -164,25 +164,7 @@ public class HeapFile<T extends IRecord<T>> {
     }
 
 
-    public void shrinkFile() throws Exception {
-        Collections.sort(freeBlocks);
 
-        long newSize = raf.length();
-
-        while (true) {
-            long lastAddr = newSize - blockSize;
-            if (lastAddr < 0) break;
-
-            if (freeBlocks.contains(lastAddr)) {
-                freeBlocks.remove(lastAddr);
-                newSize -= blockSize;
-            } else {
-                break;
-            }
-        }
-
-        raf.setLength(newSize);
-    }
 /*
     public Block<T> readBlock(long addr) throws Exception {
         byte[] buf = new byte[this.blockSize];
@@ -372,8 +354,9 @@ public Block<T> readBlock(long addr) throws Exception {
 
 
     public long writeNewBlock(Block<T> block) throws Exception {
-        long addr = raf.length();  // koniec súboru
-        writeBlockDirect(addr, block);
+        // ✅ VŽDY pridaj na koniec súboru, IGNORUJ freeBlocks
+        long addr = raf.length();
+        writeBlock(addr, block);
         return addr;
     }
 
@@ -391,6 +374,67 @@ public Block<T> readBlock(long addr) throws Exception {
     }
 
 
+    public void freeBlock(long addr) throws Exception {
+        Block<T> empty = createEmptyBlock();
+        empty.setValidCount(0);
+        empty.setNext(0);
+        writeBlock(addr, empty);
+
+        // Pridaj do freeBlocks ak tam ešte nie je
+        if (!freeBlocks.contains(addr)) {
+            freeBlocks.add(addr);
+            Collections.sort(freeBlocks);  // Drž sorted
+        }
+    }
+
+    public void shrinkFile() throws Exception {
+        Collections.sort(freeBlocks);
+
+        long newSize = raf.length();
+
+        while (true) {
+            long lastAddr = newSize - blockSize;
+            if (lastAddr < 0) break;
+
+            if (freeBlocks.contains(lastAddr)) {
+                freeBlocks.remove(lastAddr);
+                newSize -= blockSize;
+            } else {
+                break;
+            }
+        }
+
+        raf.setLength(newSize);
+    }
+
+    public void shrinkFileCompletely() throws Exception {
+        long fileLen = raf.length();
+
+        if (fileLen == 0) return;
+
+        // Prechádzaj od konca a škrtaj prázdne bloky
+        while (fileLen > 0) {
+            long lastBlockAddr = fileLen - blockSize;
+            if (lastBlockAddr < 0) break;
+
+            Block<T> block = readBlock(lastBlockAddr);
+
+            if (block.getValidCount() == 0) {
+                // Prázdny blok - odsekni ho
+                fileLen -= blockSize;
+            } else {
+                // Našli sme neprázdny blok - koniec
+                break;
+            }
+        }
+
+        // Nastav novú dĺžku súboru
+        raf.setLength(fileLen);
+
+        // ✅ Vyčisti freeBlocks - vytvor final premennú pre lambdu
+        final long newLength = fileLen;
+        freeBlocks.removeIf(addr -> addr >= newLength);
+    }
 
     public void writeBlockDirect(long offset, Block<T> b) throws Exception {
         writeBlock(offset, b);
