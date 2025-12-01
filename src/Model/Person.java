@@ -153,6 +153,12 @@ public class Person implements IRecord<Person> {
         return Math.abs(id.hashCode());
     }
 
+    @Override
+    public Person createEmpty() {
+        return new Person("", "", "", 0,0,0);
+    }
+
+
 
 
 }

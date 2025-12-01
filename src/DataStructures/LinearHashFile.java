@@ -646,12 +646,13 @@ public class LinearHashFile<T extends IRecord<T>> {
 
         // 4) ✅ Prepíš staré overflow bloky prázdnymi (NEpridávaj do freeBlocks!)
 // 4) ✅ Prepíš staré overflow bloky prázdnymi
+        /*
         for (long addr : overflowBlocks) {
             Block<T> empty = overflowFile.createEmptyBlock();
             empty.setValidCount(0);
             empty.setNext(-1);                     // 👈
             overflowFile.writeBlock(addr, empty);
-        }
+        }*/
         // 5) Pripravíme nové prázdne primárne bloky
         Block<T> blockOld = mainFile.createEmptyBlock();
         blockOld.setValidCount(0);

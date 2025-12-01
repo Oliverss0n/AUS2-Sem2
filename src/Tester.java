@@ -4,6 +4,7 @@ import DataStructures.LinearHashFile;
 import Model.Person;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Random;
 
 public class Tester {
@@ -212,6 +213,155 @@ public class Tester {
         }
     }
 
+    private static int computeIndexManual(int key, int M, int S, int u) {
+        int pow2 = (int)Math.pow(2, u);
+        int range = M * pow2;
+
+        int i = key % range;
+        if (i < 0) i += range;
+
+        if (i < S) {
+            int extRange = M * (pow2 * 2);
+            i = key % extRange;
+            if (i < 0) i += extRange;
+        }
+
+        return i;
+    }
+
+    public static void ultimateLinearHashValidation(LinearHashFile<Person> lhf,
+                                                    ArrayList<Person> model) throws Exception {
+
+        System.out.println("\n=== ULTIMATE LH VALIDATION START ===");
+
+        int M = lhf.getM();
+        int u = lhf.getU();
+        int S = lhf.getS();
+
+        int groups = S + M * (int)Math.pow(2, u);
+        int blockSize = lhf.getMainFile().getBlockSize();
+
+        // Zozbierame realitu
+        ArrayList<Person> actual = new ArrayList<>();
+
+        // mapovanie bucket → záznamy
+        ArrayList<ArrayList<Person>> bucketMap = new ArrayList<>();
+        for (int i = 0; i < groups; i++) {
+            bucketMap.add(new ArrayList<>());
+        }
+
+        // ==============================================
+        // 1. Prejdi všetky primárne bloky a overflow
+        // ==============================================
+        for (int i = 0; i < groups; i++) {
+
+            long addr = (long) i * blockSize;
+            Block<Person> block = lhf.getMainFile().readBlock(addr);
+
+            // primárne záznamy
+            for (int j = 0; j < block.getValidCount(); j++) {
+                Person p = block.getList().get(j);
+                actual.add(p);
+                bucketMap.get(i).add(p);
+            }
+
+            // overflow reťazec
+            long next = block.getNext();
+            HashSet<Long> visited = new HashSet<>();  // detekcia cyklu
+
+            while (next != -1) {
+
+                if (visited.contains(next))
+                    throw new RuntimeException("CYCLE DETECTED in overflow chain for bucket " + i);
+
+                visited.add(next);
+
+                Block<Person> ov = lhf.getOverflowFile().readBlock(next);
+                for (int j = 0; j < ov.getValidCount(); j++) {
+                    Person p = ov.getList().get(j);
+                    actual.add(p);
+                    bucketMap.get(i).add(p);
+                }
+
+                next = ov.getNext();
+            }
+        }
+
+
+        // ==============================================
+        // 2. Skontroluj počet záznamov
+        // ==============================================
+        if (model.size() != actual.size()) {
+            throw new RuntimeException("COUNT MISMATCH: expected=" + model.size() +
+                    " actual=" + actual.size());
+        }
+
+
+        // ==============================================
+        // 3. Skontroluj, že každý záznam je v správnom buckete
+        // ==============================================
+        for (Person p : model) {
+            int key = p.getHashCode();
+            int idx = computeIndexManual(key, M, S, u); // manuálne vypočítame
+
+            boolean ok = false;
+            for (Person stored : bucketMap.get(idx)) {
+                if (stored.isEqual(p)) {
+                    ok = true;
+                    break;
+                }
+            }
+
+            if (!ok) {
+                throw new RuntimeException(
+                        "WRONG BUCKET: record " + p.getId() +
+                                " SHOULD BE IN " + idx +
+                                " BUT IS NOT THERE!"
+                );
+            }
+        }
+
+
+        // ==============================================
+        // 4. Kontrola súvislosti overflow reťazcov
+        // ==============================================
+        for (int i = 0; i < groups; i++) {
+
+            long addr = (long) i * blockSize;
+            Block<Person> blk = lhf.getMainFile().readBlock(addr);
+
+            long next = blk.getNext();
+
+            if (next == 0) {
+                throw new RuntimeException("ERROR: primary block " + i +
+                        " has next=0 (must be -1 or valid addr)");
+            }
+
+            // všetky visited overflow na overenie sirot
+            HashSet<Long> seen = new HashSet<>();
+
+            while (next != -1) {
+                if (seen.contains(next))
+                    throw new RuntimeException("CYCLE in overflow chain for bucket " + i);
+
+                seen.add(next);
+
+                Block<Person> ov = lhf.getOverflowFile().readBlock(next);
+                if (ov.getValidCount() == 0) {
+                    throw new RuntimeException("EMPTY BLOCK found inside overflow chain of bucket " + i);
+                }
+
+                next = ov.getNext();
+                if (next == 0)
+                    throw new RuntimeException("ERROR: overflow block has next=0 (invalid pointer)");
+            }
+        }
+
+        System.out.println("ULTIMATE VALIDATION PASSED ✓✓✓");
+        System.out.println("=== ULTIMATE LH VALIDATION END ===\n");
+    }
+
+
 
     public static void simpleInsertFindTest(LinearHashFile<Person> lhf,
                                             int inserts,
@@ -248,6 +398,8 @@ public class Tester {
         }
 
         System.out.println("FIND OK (" + checks + " random finds)");
+        ultimateLinearHashValidation(lhf, model);
+
     }
 
 

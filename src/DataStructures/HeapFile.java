@@ -23,7 +23,8 @@ public class HeapFile<T extends IRecord<T>> {
         this.blockSize = blockSize;
         this.prototype = prototype;
 
-        this.blockFactor = (blockSize - 4) / prototype.getSize();
+        //this.blockFactor = (blockSize - 4) / prototype.getSize();
+        this.blockFactor = (blockSize - 12) / prototype.getSize();
 
         this.freeBlocks = new ArrayList<>();
         this.partialBlocks = new ArrayList<>();
@@ -51,7 +52,9 @@ public class HeapFile<T extends IRecord<T>> {
         ArrayList<T> list = new ArrayList<>(blockFactor);
         for (int i = 0; i < blockFactor; i++) {
             try {
-                list.add((T) prototype.getClass().newInstance());
+                //list.add((T) prototype.getClass().newInstance());
+                list.add(prototype.createEmpty());
+
             } catch (Exception e) {
                 throw new RuntimeException("Trieda musi mat prazdny konstruktor", e);
             }
@@ -148,6 +151,7 @@ public class HeapFile<T extends IRecord<T>> {
 
         block.getList().set(index, block.getList().get(validCount - 1));
         block.setValidCount(validCount - 1);
+        block.getList().set(block.getValidCount(), prototype.createEmpty());
 
         if (block.getValidCount() == 0) {
             handleEmptyBlock(addr);

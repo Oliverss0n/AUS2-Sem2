@@ -12,4 +12,7 @@ public interface IRecord<T> {
 
     int getHashCode();
 
+    T createEmpty();
+
+
 }
