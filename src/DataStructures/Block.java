@@ -18,6 +18,7 @@ public class Block<T extends IRecord<T>> {
         this.prototype = prototype;
         this.list = emptyList;
         this.validCount = 0;
+        this.next = -1;
     }
 
     public int getValidCount() {

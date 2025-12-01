@@ -49,16 +49,44 @@ public class LinearHashFile<T extends IRecord<T>> {
         if (mainFile.getFileLength() == 0) {
             createPrimaryBlocks();
         }
+
+        if (overflowFile.getFileLength() == 0) {
+            Block<T> dummy = overflowFile.createEmptyBlock();
+            overflowFile.writeBlock(0, dummy);
+            System.out.println("✅ Initialized overflow file with dummy block");
+        }
     }
 
+    /*
     private void createPrimaryBlocks() throws Exception {
         for (int i = 0; i < M; i++) {
             Block<T> empty = mainFile.createEmptyBlock();
             long offset = (long) i * mainFile.getBlockSize();
             mainFile.writeBlock(offset, empty);
         }
+    }*/
+
+    private void createPrimaryBlocks() throws Exception {
+        System.out.println("\n🏗️ CREATING INITIAL PRIMARY BLOCKS:");
+        for (int i = 0; i < M; i++) {
+            Block<T> empty = mainFile.createEmptyBlock();
+            System.out.println("   Block " + i + " created: next=" + empty.getNext());  // ✅
+
+            long offset = (long) i * mainFile.getBlockSize();
+            mainFile.writeBlock(offset, empty);
+
+            // ✅ VERIFIKUJ PO ZÁPISE
+            Block<T> verify = mainFile.readBlock(offset);
+            System.out.println("   Block " + i + " verified: next=" + verify.getNext());
+
+            if (verify.getNext() == 0) {
+                throw new RuntimeException("FATAL: Initial block " + i + " has next=0!");
+            }
+        }
+        System.out.println("✅ All primary blocks initialized\n");
     }
 
+    /*
     public void insert(T record) throws Exception {
 
         int key = record.getHashCode();
@@ -82,8 +110,73 @@ public class LinearHashFile<T extends IRecord<T>> {
         }
 
         insertIntoOverflow(index, record);
-    }
+    }*/
+/*
+    public void insert(T record) throws Exception {
+        int key = record.getHashCode();
+        int index = getIndex(key);
 
+        long offset = (long) index * mainFile.getBlockSize();
+        Block<T> block = mainFile.readBlock(offset);
+
+        if (block.getValidCount() < mainFile.getBlockFactor()) {
+            block.getList().set(block.getValidCount(), record);
+            block.setValidCount(block.getValidCount() + 1);
+            mainFile.writeBlock(offset, block);
+            totalRecords++;
+            recordCountPerIndex[index]++;
+
+            System.out.println("📝 Insert #" + totalRecords + ": density=" + String.format("%.4f", getDensity()) + ", d_max=" + d_max);  // ✅ PRIDAJ
+
+            if (getDensity() > d_max) {
+                System.out.println("🚨 TRIGGERING SPLIT!");  // ✅ PRIDAJ
+                split();
+            }
+            return;
+        }
+
+        insertIntoOverflow(index, record);
+    }
+*/
+
+    public void insert(T record) throws Exception {
+        int key = record.getHashCode();
+        int index = getIndex(key);
+
+        long offset = (long) index * mainFile.getBlockSize();
+        Block<T> block = mainFile.readBlock(offset);
+
+        System.out.println("📝 Insert #" + (totalRecords + 1) +
+                ": index=" + index +
+                ", primaryValid=" + block.getValidCount() +
+                "/" + mainFile.getBlockFactor() +
+                ", currentNext=" + block.getNext());  // ✅ PRIDAJ
+
+        if (block.getValidCount() < mainFile.getBlockFactor()) {
+            block.getList().set(block.getValidCount(), record);
+            block.setValidCount(block.getValidCount() + 1);
+
+            System.out.println("   → Writing to primary, newValid=" + block.getValidCount() + ", next=" + block.getNext());  // ✅
+
+            mainFile.writeBlock(offset, block);
+
+            // ✅ VERIFIKUJ PO ZÁPISE
+            Block<T> verify = mainFile.readBlock(offset);
+            System.out.println("   → Verified after write: next=" + verify.getNext());
+            if (verify.getNext() == 0) {
+                throw new RuntimeException("PRIMARY BLOCK CORRUPTED at insert #" + (totalRecords + 1));
+            }
+
+            totalRecords++;
+            recordCountPerIndex[index]++;
+
+            if (getDensity() > d_max) split();
+            return;
+        }
+
+        System.out.println("   → Primary full, going to overflow");
+        insertIntoOverflow(index, record);
+    }
     /*
     private void insertIntoOverflow(int index, T record) throws Exception {
 
@@ -146,7 +239,7 @@ public class LinearHashFile<T extends IRecord<T>> {
         }
     }*/
 
-
+/*
     private void insertIntoOverflow(int index, T record) throws Exception {
 
         long primaryAddr = (long) index * mainFile.getBlockSize();
@@ -208,6 +301,146 @@ public class LinearHashFile<T extends IRecord<T>> {
             current = overflowFile.readBlock(currentAddr);
         }
     }
+*/
+
+    private void insertIntoOverflow(int index, T record) throws Exception {
+
+        long primaryAddr = (long) index * mainFile.getBlockSize();
+        Block<T> primary = mainFile.readBlock(primaryAddr);
+        long nextAddr = primary.getNext();
+
+        System.out.println("🔗 insertIntoOverflow: index=" + index + ", primary.next=" + nextAddr);
+
+        // ==========================================
+        // PRÍPAD 1: Žiadny overflow reťazec
+        // ==========================================
+        if (nextAddr == -1) {
+            Block<T> newBlock = overflowFile.createEmptyBlock();
+            newBlock.getList().set(0, record);
+            newBlock.setValidCount(1);
+            newBlock.setNext(-1);
+
+            long newAddr = overflowFile.writeNewBlock(newBlock);
+            System.out.println("   ✅ Created first overflow block @" + newAddr);
+
+            // 🔥 KRITICKÁ OPRAVA: Re-read primárny blok!
+            primary = mainFile.readBlock(primaryAddr);
+            primary.setNext(newAddr);
+
+            System.out.println("   📌 Linking primary@" + primaryAddr + " -> overflow@" + newAddr);
+
+            mainFile.writeBlock(primaryAddr, primary);
+
+            // ✅ VERIFIKÁCIA
+            Block<T> verify = mainFile.readBlock(primaryAddr);
+            System.out.println("   ✔️ Verified: primary.next=" + verify.getNext());
+            if (verify.getNext() != newAddr) {
+                throw new RuntimeException("OVERFLOW LINK CORRUPTION at index " + index);
+            }
+
+            overflowChainLength[index]++;
+            totalRecords++;
+
+            if (getDensity() > d_max) split();  // ✅ PRIDAJ TOTO!
+            return;
+        }
+
+        // ==========================================
+        // PRÍPAD 2: Overflow reťazec už existuje
+        // ==========================================
+        long currentAddr = nextAddr;
+        Block<T> current = overflowFile.readBlock(currentAddr);
+
+        System.out.println("   📂 Traversing existing overflow chain starting @" + currentAddr);
+
+        while (true) {
+
+            // Skús vložiť do aktuálneho bloku
+            if (current.getValidCount() < overflowFile.getBlockFactor()) {
+                System.out.println("   ✅ Found space in overflow@" + currentAddr + " (valid=" + current.getValidCount() + ")");
+
+                current.getList().set(current.getValidCount(), record);
+                current.setValidCount(current.getValidCount() + 1);
+
+                overflowFile.writeBlock(currentAddr, current);
+
+                totalRecords++;
+
+                if (getDensity() > d_max) split();  // ✅ PRIDAJ TOTO!
+                return;
+            }
+
+            // Aktuálny blok je plný, skús ďalší
+            if (current.getNext() == -1) {
+                // Koniec reťazca - vytvor nový blok
+                System.out.println("   📦 End of chain, creating new overflow block");
+
+                Block<T> newBlock = overflowFile.createEmptyBlock();
+                newBlock.getList().set(0, record);
+                newBlock.setValidCount(1);
+                newBlock.setNext(-1);
+
+                long newAddr = overflowFile.writeNewBlock(newBlock);
+                System.out.println("   ✅ Created overflow block @" + newAddr);
+
+                // Link predchádzajúci blok
+                current.setNext(newAddr);
+                overflowFile.writeBlock(currentAddr, current);
+
+                System.out.println("   🔗 Linked overflow@" + currentAddr + " -> overflow@" + newAddr);
+
+                overflowChainLength[index]++;
+                totalRecords++;
+
+                if (getDensity() > d_max) split();  // ✅ PRIDAJ TOTO!
+                return;
+            }
+
+            // Pokračuj na ďalší blok
+            currentAddr = current.getNext();
+            current = overflowFile.readBlock(currentAddr);
+            System.out.println("   → Moving to next overflow@" + currentAddr);
+        }
+    }
+/*
+    private void insertIntoOverflow(int index, T record) throws Exception {
+        long primaryAddr = (long) index * mainFile.getBlockSize();
+        Block<T> primary = mainFile.readBlock(primaryAddr);
+        long nextAddr = primary.getNext();
+
+        System.out.println("🔗 insertIntoOverflow: index=" + index + ", primary.next=" + nextAddr);
+
+        if (nextAddr == -1) {
+            Block<T> newBlock = overflowFile.createEmptyBlock();
+            newBlock.getList().set(0, record);
+            newBlock.setValidCount(1);
+            newBlock.setNext(-1);
+
+            long newAddr = overflowFile.writeNewBlock(newBlock);
+            System.out.println("   Created new overflow block @" + newAddr);
+
+            // ✅ KRITICKÁ OPRAVA: Re-read primárny blok pred zápisom!
+            primary = mainFile.readBlock(primaryAddr);  // 🔥 PRIDAJ TOTO
+            primary.setNext(newAddr);
+
+            System.out.println("   Setting primary.next=" + newAddr + " (was " + primary.getNext() + ")");
+
+            mainFile.writeBlock(primaryAddr, primary);
+
+            // ✅ VERIFIKUJ
+            Block<T> verify = mainFile.readBlock(primaryAddr);
+            System.out.println("   Verified: primary.next=" + verify.getNext());
+            if (verify.getNext() != newAddr) {
+                throw new RuntimeException("OVERFLOW LINK CORRUPTION!");
+            }
+
+            overflowChainLength[index]++;
+            totalRecords++;
+            return;
+        }
+
+ */
+
 
     /*
     public T find(T data) throws Exception {
@@ -411,7 +644,7 @@ public class LinearHashFile<T extends IRecord<T>> {
         return false;
     }
 
-
+/*
     public boolean delete(T pattern) throws Exception {
 
         int key = pattern.getHashCode();
@@ -438,7 +671,7 @@ public class LinearHashFile<T extends IRecord<T>> {
         long prevAddr = 0;
         long currentAddr = primary.getNext();
 
-        while (currentAddr != 0) {
+        while (currentAddr != -1) {
 
             Block<T> ov = overflowFile.readBlock(currentAddr);
 
@@ -463,8 +696,8 @@ public class LinearHashFile<T extends IRecord<T>> {
 
         return false;
     }
-
-
+*/
+public boolean delete(T pattern) throws Exception{return false;}
     //pomocna metoda kvoli duplicite
     private boolean deleteFromBlock(HeapFile<T> file, long addr, Block<T> block, T data) throws Exception {
 
@@ -543,62 +776,7 @@ public class LinearHashFile<T extends IRecord<T>> {
         return (double) totalRecords / totalCapacity;
     }
 
-
-    /*
-    private void split() throws Exception {
-
-        int oldIndex = S;
-        int newIndex = S + M * (int) Math.pow(2, u);
-
-        long oldAddr = (long) oldIndex * mainFile.getBlockSize();
-        long newAddr = (long) newIndex * mainFile.getBlockSize();
-
-        Block<T> oldBlock = mainFile.readBlock(oldAddr);
-
-        Block<T> blockOld = mainFile.createEmptyBlock();
-        Block<T> blockNew = mainFile.createEmptyBlock();
-
-        int divisor = M * (int) Math.pow(2, u + 1);
-
-        for (int i = 0; i < oldBlock.getValidCount(); i++) {
-
-            T record = oldBlock.getList().get(i);
-            int key = record.getHashCode();
-
-            int index = key % divisor;
-            if (index < 0) {
-                index += divisor;
-            }
-
-            if (index == oldIndex) {
-
-                blockOld.getList().set(blockOld.getValidCount(), record);
-                blockOld.setValidCount(blockOld.getValidCount() + 1);
-
-            } else {
-
-                blockNew.getList().set(blockNew.getValidCount(), record);
-                blockNew.setValidCount(blockNew.getValidCount() + 1);
-            }
-        }
-
-        mainFile.writeBlock(oldAddr, blockOld);
-        mainFile.writeBlock(newAddr, blockNew);
-
-        recordCountPerIndex[oldIndex] = blockOld.getValidCount();
-        recordCountPerIndex[newIndex] = blockNew.getValidCount();
-
-        S++;
-
-        int groupsBefore = M * (int) Math.pow(2, u);
-
-        if (S >= groupsBefore) {
-            S = 0;
-            u++;
-        }
-    }*/
-
-
+/*
     private void split() throws Exception {
 
         System.out.println("\n=== SPLIT START ===");
@@ -644,15 +822,7 @@ public class LinearHashFile<T extends IRecord<T>> {
         System.out.println("Total records collected: " + allRecords.size());
         System.out.println("Overflow blocks to clear: " + overflowBlocks);
 
-        // 4) ✅ Prepíš staré overflow bloky prázdnymi (NEpridávaj do freeBlocks!)
-// 4) ✅ Prepíš staré overflow bloky prázdnymi
-        /*
-        for (long addr : overflowBlocks) {
-            Block<T> empty = overflowFile.createEmptyBlock();
-            empty.setValidCount(0);
-            empty.setNext(-1);                     // 👈
-            overflowFile.writeBlock(addr, empty);
-        }*/
+
         // 5) Pripravíme nové prázdne primárne bloky
         Block<T> blockOld = mainFile.createEmptyBlock();
         blockOld.setValidCount(0);
@@ -789,6 +959,368 @@ public class LinearHashFile<T extends IRecord<T>> {
         overflowFile.shrinkFileCompletely();
         System.out.println("Overflow file length after shrink: " + overflowFile.getFileLength());
         System.out.println("=== SPLIT END ===\n");
+    }*/
+/*
+    private void split() throws Exception {
+
+        int oldIndex = S;
+        int base     = M * (int) Math.pow(2, u);
+        int newIndex = oldIndex + base;
+        int divisor  = M * (int) Math.pow(2, u + 1);
+
+        long blockSize = mainFile.getBlockSize();
+        long oldAddr   = (long) oldIndex * blockSize;
+        long newAddr   = (long) newIndex * blockSize;
+
+        // 1) Zožeň všetky záznamy starého bucketu
+        ArrayList<T> all = new ArrayList<>();
+        Block<T> oldPrim = mainFile.readBlock(oldAddr);
+
+        for (int i = 0; i < oldPrim.getValidCount(); i++)
+            all.add(oldPrim.getList().get(i));
+
+        long ovAddr = oldPrim.getNext();
+        while (ovAddr != -1) {
+            Block<T> ov = overflowFile.readBlock(ovAddr);
+            for (int i = 0; i < ov.getValidCount(); i++)
+                all.add(ov.getList().get(i));
+            ovAddr = ov.getNext();
+        }
+
+        // 2) Priprav prázdne primárne bloky
+        Block<T> bOld = mainFile.createEmptyBlock();
+        Block<T> bNew = mainFile.createEmptyBlock();
+        bOld.setValidCount(0); bOld.setNext(-1);
+        bNew.setValidCount(0); bNew.setNext(-1);
+
+        ArrayList<T> ovOld = new ArrayList<>();
+        ArrayList<T> ovNew = new ArrayList<>();
+
+        int pBF = mainFile.getBlockFactor();
+        int oBF = overflowFile.getBlockFactor();
+
+        // 3) Rozdelenie záznamov podľa nového modula
+        for (T r : all) {
+            int idx = r.getHashCode() % divisor;
+            if (idx < 0) idx += divisor;
+
+            if (idx == oldIndex) {
+                if (bOld.getValidCount() < pBF) {
+                    bOld.getList().set(bOld.getValidCount(), r);
+                    bOld.setValidCount(bOld.getValidCount() + 1);
+                } else ovOld.add(r);
+            } else {
+                if (bNew.getValidCount() < pBF) {
+                    bNew.getList().set(bNew.getValidCount(), r);
+                    bNew.setValidCount(bNew.getValidCount() + 1);
+                } else ovNew.add(r);
+            }
+        }
+
+        // 4) Vybuduj overflow reťazec pre oldIndex
+        long firstOld = -1, prev = -1;
+        int pos = 0;
+        while (pos < ovOld.size()) {
+            Block<T> b = overflowFile.createEmptyBlock();
+            int cnt = 0;
+            while (cnt < oBF && pos < ovOld.size()) {
+                b.getList().set(cnt, ovOld.get(pos));
+                cnt++; pos++;
+            }
+            b.setValidCount(cnt);
+            b.setNext(-1);
+
+            long addr = overflowFile.writeNewBlock(b);
+            if (firstOld == -1) firstOld = addr;
+            else {
+                Block<T> p = overflowFile.readBlock(prev);
+                p.setNext(addr);
+                overflowFile.writeBlock(prev, p);
+            }
+            prev = addr;
+        }
+        bOld.setNext(firstOld);
+
+        // 5) Overflow reťazec pre newIndex
+        long firstNew = -1; prev = -1; pos = 0;
+        while (pos < ovNew.size()) {
+            Block<T> b = overflowFile.createEmptyBlock();
+            int cnt = 0;
+            while (cnt < oBF && pos < ovNew.size()) {
+                b.getList().set(cnt, ovNew.get(pos));
+                cnt++; pos++;
+            }
+            b.setValidCount(cnt);
+            b.setNext(-1);
+
+            long addr = overflowFile.writeNewBlock(b);
+            if (firstNew == -1) firstNew = addr;
+            else {
+                Block<T> p = overflowFile.readBlock(prev);
+                p.setNext(addr);
+                overflowFile.writeBlock(prev, p);
+            }
+            prev = addr;
+        }
+        bNew.setNext(firstNew);
+
+        // 6) Zapíš primárne bloky
+        mainFile.writeBlock(oldAddr, bOld);
+        mainFile.writeBlock(newAddr, bNew);
+
+        // 7) Posuň S a u
+        S++;
+        if (S >= base) {
+            S = 0;
+            u++;
+        }
+
+        // 8) Zreže koniec overflow súboru
+        overflowFile.shrinkFileCompletely();
+    }
+*/
+
+    private void split() throws Exception {
+
+        System.out.println("\n╔════════════════════════════════════════╗");
+        System.out.println("║         SPLIT START                    ║");
+        System.out.println("╚════════════════════════════════════════╝");
+
+        int oldIndex = S;
+        int base = M * (int) Math.pow(2, u);
+        int newIndex = oldIndex + base;
+        int divisor = M * (int) Math.pow(2, u + 1);
+
+        long blockSize = mainFile.getBlockSize();
+        long oldAddr = (long) oldIndex * blockSize;
+        long newAddr = (long) newIndex * blockSize;
+
+        System.out.println("📊 SPLIT PARAMETERS:");
+        System.out.println("   M=" + M + ", u=" + u + ", S=" + S);
+        System.out.println("   oldIndex=" + oldIndex + " @addr=" + oldAddr);
+        System.out.println("   newIndex=" + newIndex + " @addr=" + newAddr);
+        System.out.println("   divisor=" + divisor);
+        System.out.println("   mainFile.length=" + mainFile.getFileLength());
+
+        // ==========================================
+        // 1) Zbierka všetkých záznamov
+        // ==========================================
+        System.out.println("\n🔍 COLLECTING RECORDS FROM OLD BUCKET:");
+
+        ArrayList<T> all = new ArrayList<>();
+        Block<T> oldPrim = mainFile.readBlock(oldAddr);
+
+        System.out.println("   Old primary: validCount=" + oldPrim.getValidCount() + ", next=" + oldPrim.getNext());
+
+        for (int i = 0; i < oldPrim.getValidCount(); i++)
+            all.add(oldPrim.getList().get(i));
+
+        long ovAddr = oldPrim.getNext();
+        int overflowCount = 0;
+        while (ovAddr != -1) {
+            Block<T> ov = overflowFile.readBlock(ovAddr);
+            System.out.println("   Overflow block @" + ovAddr + ": validCount=" + ov.getValidCount() + ", next=" + ov.getNext());
+
+            for (int i = 0; i < ov.getValidCount(); i++)
+                all.add(ov.getList().get(i));
+
+            overflowCount++;
+            ovAddr = ov.getNext();
+        }
+
+        System.out.println("✅ Total records collected: " + all.size());
+        System.out.println("✅ Overflow blocks traversed: " + overflowCount);
+
+        // ==========================================
+        // 2) Príprava prázdnych primárnych blokov
+        // ==========================================
+        System.out.println("\n🆕 CREATING NEW PRIMARY BLOCKS:");
+
+        Block<T> bOld = mainFile.createEmptyBlock();
+        Block<T> bNew = mainFile.createEmptyBlock();
+
+        bOld.setValidCount(0);
+        bOld.setNext(-1);
+        bNew.setValidCount(0);
+        bNew.setNext(-1);
+
+        System.out.println("   bOld created: validCount=" + bOld.getValidCount() + ", next=" + bOld.getNext());
+        System.out.println("   bNew created: validCount=" + bNew.getValidCount() + ", next=" + bNew.getNext());
+
+        ArrayList<T> ovOld = new ArrayList<>();
+        ArrayList<T> ovNew = new ArrayList<>();
+
+        int pBF = mainFile.getBlockFactor();
+        int oBF = overflowFile.getBlockFactor();
+
+        // ==========================================
+        // 3) Redistribúcia záznamov
+        // ==========================================
+        System.out.println("\n📦 REDISTRIBUTING RECORDS:");
+
+        for (T r : all) {
+            int idx = r.getHashCode() % divisor;
+            if (idx < 0) idx += divisor;
+
+            if (idx == oldIndex) {
+                if (bOld.getValidCount() < pBF) {
+                    bOld.getList().set(bOld.getValidCount(), r);
+                    bOld.setValidCount(bOld.getValidCount() + 1);
+                } else ovOld.add(r);
+            } else {
+                if (bNew.getValidCount() < pBF) {
+                    bNew.getList().set(bNew.getValidCount(), r);
+                    bNew.setValidCount(bNew.getValidCount() + 1);
+                } else ovNew.add(r);
+            }
+        }
+
+        System.out.println("   Old bucket: primary=" + bOld.getValidCount() + ", overflow=" + ovOld.size());
+        System.out.println("   New bucket: primary=" + bNew.getValidCount() + ", overflow=" + ovNew.size());
+
+        // ==========================================
+        // 4) Overflow reťazec pre oldIndex
+        // ==========================================
+        System.out.println("\n🔗 BUILDING OVERFLOW CHAIN FOR OLD BUCKET:");
+
+        long firstOld = -1, prev = -1;
+        int pos = 0;
+        int ovBlockCountOld = 0;
+
+        while (pos < ovOld.size()) {
+            Block<T> b = overflowFile.createEmptyBlock();
+            int cnt = 0;
+            while (cnt < oBF && pos < ovOld.size()) {
+                b.getList().set(cnt, ovOld.get(pos));
+                cnt++;
+                pos++;
+            }
+            b.setValidCount(cnt);
+            b.setNext(-1);
+
+            long addr = overflowFile.writeNewBlock(b);
+            ovBlockCountOld++;
+
+            System.out.println("   Created overflow block #" + ovBlockCountOld + " @" + addr + " with " + cnt + " records");
+
+            if (firstOld == -1) {
+                firstOld = addr;
+            } else {
+                Block<T> p = overflowFile.readBlock(prev);
+                p.setNext(addr);
+                overflowFile.writeBlock(prev, p);
+                System.out.println("   Linked: block@" + prev + " -> block@" + addr);
+            }
+            prev = addr;
+        }
+
+        bOld.setNext(firstOld);
+        System.out.println("✅ Old overflow chain: firstAddr=" + firstOld + ", totalBlocks=" + ovBlockCountOld);
+
+        // ==========================================
+        // 5) Overflow reťazec pre newIndex
+        // ==========================================
+        System.out.println("\n🔗 BUILDING OVERFLOW CHAIN FOR NEW BUCKET:");
+
+        long firstNew = -1;
+        prev = -1;
+        pos = 0;
+        int ovBlockCountNew = 0;
+
+        while (pos < ovNew.size()) {
+            Block<T> b = overflowFile.createEmptyBlock();
+            int cnt = 0;
+            while (cnt < oBF && pos < ovNew.size()) {
+                b.getList().set(cnt, ovNew.get(pos));
+                cnt++;
+                pos++;
+            }
+            b.setValidCount(cnt);
+            b.setNext(-1);
+
+            long addr = overflowFile.writeNewBlock(b);
+            ovBlockCountNew++;
+
+            System.out.println("   Created overflow block #" + ovBlockCountNew + " @" + addr + " with " + cnt + " records");
+
+            if (firstNew == -1) {
+                firstNew = addr;
+            } else {
+                Block<T> p = overflowFile.readBlock(prev);
+                p.setNext(addr);
+                overflowFile.writeBlock(prev, p);
+                System.out.println("   Linked: block@" + prev + " -> block@" + addr);
+            }
+            prev = addr;
+        }
+
+        bNew.setNext(firstNew);
+        System.out.println("✅ New overflow chain: firstAddr=" + firstNew + ", totalBlocks=" + ovBlockCountNew);
+
+        // ==========================================
+        // 6) Zápis primárnych blokov
+        // ==========================================
+        System.out.println("\n💾 WRITING PRIMARY BLOCKS:");
+        System.out.println("   Writing OLD block @" + oldAddr + " (validCount=" + bOld.getValidCount() + ", next=" + bOld.getNext() + ")");
+        System.out.println("   Writing NEW block @" + newAddr + " (validCount=" + bNew.getValidCount() + ", next=" + bNew.getNext() + ")");
+
+        // 🔥 KRITICKÁ KONTROLA PRED ZÁPISOM
+        if (bOld.getNext() == 0) {
+            System.out.println("🔴🔴🔴 ERROR: bOld.next=0 BEFORE WRITE!");
+            throw new RuntimeException("CRITICAL: bOld has next=0");
+        }
+        if (bNew.getNext() == 0) {
+            System.out.println("🔴🔴🔴 ERROR: bNew.next=0 BEFORE WRITE!");
+            throw new RuntimeException("CRITICAL: bNew has next=0");
+        }
+
+        mainFile.writeBlock(oldAddr, bOld);
+        mainFile.writeBlock(newAddr, bNew);
+
+        // ==========================================
+        // 7) Verifikácia po zápise
+        // ==========================================
+        System.out.println("\n✅ VERIFICATION AFTER WRITE:");
+
+        Block<T> verifyOld = mainFile.readBlock(oldAddr);
+        Block<T> verifyNew = mainFile.readBlock(newAddr);
+
+        System.out.println("   Read back OLD: validCount=" + verifyOld.getValidCount() + ", next=" + verifyOld.getNext());
+        System.out.println("   Read back NEW: validCount=" + verifyNew.getValidCount() + ", next=" + verifyNew.getNext());
+
+        if (verifyOld.getNext() == 0) {
+            System.out.println("🔴🔴🔴 FATAL: OLD block has next=0 AFTER READ!");
+            throw new RuntimeException("SPLIT CORRUPTION: old block next=0");
+        }
+        if (verifyNew.getNext() == 0) {
+            System.out.println("🔴🔴🔴 FATAL: NEW block has next=0 AFTER READ!");
+            throw new RuntimeException("SPLIT CORRUPTION: new block next=0");
+        }
+
+        // ==========================================
+        // 8) Update S, u
+        // ==========================================
+        System.out.println("\n📈 UPDATING COUNTERS:");
+        System.out.println("   Before: S=" + S + ", u=" + u);
+
+        S++;
+        if (S >= base) {
+            S = 0;
+            u++;
+        }
+
+        System.out.println("   After:  S=" + S + ", u=" + u);
+
+        // ==========================================
+        // 9) Cleanup
+        // ==========================================
+        System.out.println("\n🧹 CLEANUP:");
+        overflowFile.shrinkFileCompletely();
+        System.out.println("   Overflow file shrunk to: " + overflowFile.getFileLength());
+
+        System.out.println("\n╔════════════════════════════════════════╗");
+        System.out.println("║         SPLIT END ✅                   ║");
+        System.out.println("╚════════════════════════════════════════╝\n");
     }
 
 
@@ -891,8 +1423,8 @@ public class LinearHashFile<T extends IRecord<T>> {
             overflowFile.writeBlock(prevAddr, prev);
         }
         // fyzicky odrežeme blok zo súboru
-        overflowFile.shrinkFile();
-
+        //overflowFile.shrinkFile();
+        overflowFile.shrinkFileCompletely();
         // štatistika
         if (overflowChainLength[index] > 0)
             overflowChainLength[index]--;

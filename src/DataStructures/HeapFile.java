@@ -16,6 +16,8 @@ public class HeapFile<T extends IRecord<T>> {
     private ArrayList<Long> partialBlocks;
     private T prototype;
 
+    private boolean isOverflow;
+
     public HeapFile(String path, int blockSize, T prototype) throws Exception {
         this.path = path;
         this.metaPath = path + ".meta";
@@ -32,6 +34,10 @@ public class HeapFile<T extends IRecord<T>> {
         this.raf = new RandomAccessFile(path, "rw");
 
         this.loadMetadata();
+        if (isOverflow && raf.length() == 0) {
+            Block<T> dummy = emptyBlock();
+            writeBlock(0, dummy);
+        }
     }
 
 
@@ -250,38 +256,44 @@ public Block<T> readBlock(long addr) throws Exception {
         raf.write(raw);
     } */
 
-
+    //checknut este
     public void writeBlock(long addr, Block<T> block) throws Exception {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         DataOutputStream dos = new DataOutputStream(baos);
 
-        // 1) write valid count
+        // 1) validCount
         dos.writeInt(block.getValidCount());
 
-        // 2) write next pointer
+        // 2) next pointer
         dos.writeLong(block.getNext());
 
-        // 3) write all T records
+        // 3) T records
         for (int i = 0; i < blockFactor; i++) {
-            T rec = block.getList().get(i);
-            ArrayList<Byte> bytes = rec.getBytes();
-            for (byte b : bytes) {
+            ArrayList<Byte> bytes = block.getList().get(i).getBytes();
+            for (byte b : bytes)
                 dos.writeByte(b);
-            }
         }
 
-        byte[] raw = baos.toByteArray();
+        byte[] tmp = baos.toByteArray();
 
-        // pad to full blockSize
-        while (raw.length < blockSize) {
-            baos.write(0);
-            raw = baos.toByteArray();
+        // ---- SAFE PADDING ----
+        byte[] finalBytes = new byte[blockSize];
+
+        int limit = Math.min(tmp.length, blockSize);
+        for (int i = 0; i < limit; i++) {
+            finalBytes[i] = tmp[i];
         }
+
+        // zvyšok necháme 0
+        // ----------------------
 
         raf.seek(addr);
-        raf.write(raw);
+        raf.write(finalBytes);
     }
+
+
+
 
 
 
@@ -374,18 +386,11 @@ public Block<T> readBlock(long addr) throws Exception {
         return sb.toString();
     }
 
-/*
     public long writeNewBlock(Block<T> block) throws Exception {
-        // ✅ VŽDY pridaj na koniec súboru, IGNORUJ freeBlocks
         long addr = raf.length();
         writeBlock(addr, block);
         return addr;
-    }*/
-public long writeNewBlock(Block<T> block) throws Exception {
-    long addr = raf.length();
-    writeBlock(addr, block);
-    return addr;
-}
+    }
 
 
     public long getFileLength() throws Exception {
@@ -395,24 +400,6 @@ public long writeNewBlock(Block<T> block) throws Exception {
         return blockSize;
     }
 
-
-    public void writeBlockForTest(long addr, Block<T> block) throws Exception {
-        writeBlock(addr, block);
-    }
-
-
-    public void freeBlock(long addr) throws Exception {
-        Block<T> empty = createEmptyBlock();
-        empty.setValidCount(0);
-        empty.setNext(0);
-        writeBlock(addr, empty);
-
-        // Pridaj do freeBlocks ak tam ešte nie je
-        if (!freeBlocks.contains(addr)) {
-            freeBlocks.add(addr);
-            Collections.sort(freeBlocks);  // Drž sorted
-        }
-    }
 
     public void shrinkFile() throws Exception {
         Collections.sort(freeBlocks);
@@ -434,7 +421,9 @@ public long writeNewBlock(Block<T> block) throws Exception {
         raf.setLength(newSize);
     }
 
+    /*
     public void shrinkFileCompletely() throws Exception {
+
         long fileLen = raf.length();
         if (fileLen == 0) return;
 
@@ -466,11 +455,45 @@ public long writeNewBlock(Block<T> block) throws Exception {
                 i++;
             }
         }
+
+    }*/
+
+    public void shrinkFileCompletely() throws Exception {
+        long fileLen = raf.length();
+        if (fileLen == 0) return;
+
+        // ✅ KRITICKÉ: Ak je toto overflow file, chráň prvý blok
+        // (pozná sa podľa toho, že sa volá shrinkFileCompletely)
+        long minSize = blockSize;  // Rezervovaný dummy blok na addr=0
+
+        // Prechádzaj od konca a škrtaj prázdne bloky
+        while (fileLen > minSize) {
+            long lastBlockAddr = fileLen - blockSize;
+            if (lastBlockAddr < 0) break;
+
+            Block<T> block = readBlock(lastBlockAddr);
+
+            if (block.getValidCount() == 0) {
+                fileLen -= blockSize;
+            } else {
+                break;
+            }
+        }
+
+        // Nastav novú dĺžku (minimálne 1 blok pre overflow)
+        raf.setLength(Math.max(fileLen, minSize));
+
+        // Vyčisti freeBlocks
+        int i = 0;
+        while (i < freeBlocks.size()) {
+            if (freeBlocks.get(i) >= fileLen) {
+                freeBlocks.remove(i);
+            } else {
+                i++;
+            }
+        }
     }
 
-    public void writeBlockDirect(long offset, Block<T> b) throws Exception {
-        writeBlock(offset, b);
-    }
     public int getBlockFactor() {
         return blockFactor;
     }

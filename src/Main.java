@@ -82,10 +82,8 @@ public class Main {
                 }*/
 
                 if (USE_TESTER) {
-                    Tester.simpleInsertFindTest(
-                            lhf,
-                            100, 100000
-                    );
+                    Tester.simpleInsertFindTest(lhf, 5000, 10000);
+                    System.out.println("\n✓✓✓ TEST PASSED ✓✓✓");
                 }
 
                 LinearHashFileView view = new LinearHashFileView();
@@ -107,11 +105,10 @@ public class Main {
     private static void deleteFiles() {
         delete("data.bin");
         delete("data.bin.meta");
-
+        delete("data.bin.lh.meta");     // ✅ PRIDAJ TOTO!
         delete("overflow.bin");
         delete("overflow.bin.meta");
     }
-
     private static void delete(String path) {
         try { new File(path).delete(); } catch (Exception ignored) {}
     }

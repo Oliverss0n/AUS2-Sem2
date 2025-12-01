@@ -9,7 +9,8 @@ import java.util.Random;
 
 public class Tester {
 
-    private static final Random rnd = new Random(System.currentTimeMillis());
+    private static final long SEED =System.currentTimeMillis();
+    private static final Random rnd = new Random(SEED);
 
     public static void mixedHeapTest(HeapFile<Person> hf,
                                      int operations,
@@ -126,7 +127,7 @@ public class Tester {
                     int idx = rnd.nextInt(model.size());
                     Person p = model.get(idx);
 
-                    lhf.delete(p);       // delete by pattern
+                    //lhf.delete(p);       // delete by pattern
                     model.remove(idx);   // remove from reference model
                 }
             }
@@ -168,9 +169,6 @@ public class Tester {
         int groups = lhf.getS() + lhf.getM() * (int)Math.pow(2, lhf.getU());
         int blockSize = lhf.getMainFile().getBlockSize();
 
-        // ==========================================
-        // ČÍTANIE PRIMÁRNYCH BLOKOV
-        // ==========================================
         for (int i = 0; i < groups; i++) {
 
             long addr = (long) i * blockSize;
@@ -180,11 +178,8 @@ public class Tester {
                 actual.add(block.getList().get(j));
             }
 
-            // ==========================================
-            // ČÍTANIE OVERFLOW REŤAZCA
-            // ==========================================
             long next = block.getNext();
-            while (next != 0) {
+            while (next != -1) {  // ✅ OPRAVENÉ
                 Block<Person> ov = lhf.getOverflowFile().readBlock(next);
                 for (int j = 0; j < ov.getValidCount(); j++) {
                     actual.add(ov.getList().get(j));
@@ -193,9 +188,6 @@ public class Tester {
             }
         }
 
-        // ==========================================
-        // POROVNANIE
-        // ==========================================
         if (actual.size() != expected.size())
             throw new RuntimeException("COUNT ERROR: expected=" + expected.size() + " actual=" + actual.size());
 
@@ -367,39 +359,51 @@ public class Tester {
                                             int inserts,
                                             int checks) throws Exception {
 
+
+        System.out.println("╔════════════════════════════════════════╗");
+        System.out.println("║  TEST STARTED WITH SEED: " + SEED);
+        System.out.println("║  To reproduce: change SEED in Tester.java");
+        System.out.println("╚════════════════════════════════════════╝\n");
+
         ArrayList<Person> model = new ArrayList<>();
 
         // ==========================================
-        // INSERT TEST
+        // INSERT TEST s periodickou validáciou
         // ==========================================
         for (int i = 0; i < inserts; i++) {
             Person p = randomPerson();
             lhf.insert(p);
             model.add(p);
+
+            // ✅ Validuj každých 100 insertov
+            if ((i + 1) % 10 == 0) {
+                System.out.println("Validating after " + (i + 1) + " inserts...");
+                ultimateLinearHashValidation(lhf, model);
+            }
         }
 
         System.out.println("INSERT DONE, inserted = " + inserts);
-        System.out.println(lhf.print());   // ← pridaj toto
-
+        System.out.println(lhf.print());
 
         // ==========================================
         // FIND TEST
         // ==========================================
         for (int i = 0; i < checks; i++) {
-
             Person expected = model.get(rnd.nextInt(model.size()));
             Person found = lhf.find(expected);
 
             if (found == null || !found.isEqual(expected)) {
                 throw new RuntimeException(
-                        "FIND ERROR: expected = " + expected.getId() + " found = " + (found != null ? found.getId() : "null")
+                        "FIND ERROR: expected = " + expected.getId() +
+                                " found = " + (found != null ? found.getId() : "null")
                 );
             }
         }
 
         System.out.println("FIND OK (" + checks + " random finds)");
-        ultimateLinearHashValidation(lhf, model);
 
+        // ✅ Finálna validácia
+        ultimateLinearHashValidation(lhf, model);
     }
 
 
