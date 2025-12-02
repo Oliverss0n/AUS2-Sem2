@@ -13,7 +13,7 @@ public class LinearHashFilePresenter {
     private final LinearHashFileView view;
     private final Random rnd = new Random();
 
-    private static final int GEN_COUNT = 100; // ako v HeapFilePresenter
+    private static final int GEN_COUNT = 100;
     private int idCounter = 0;
 
     public LinearHashFilePresenter(LinearHashFileView view,
@@ -22,9 +22,6 @@ public class LinearHashFilePresenter {
         this.hashFile = hashFile;
     }
 
-    // ============================================================
-    // INSERT random person
-    // ============================================================
     public void onInsert() {
         try {
             Person p = randomPerson();
@@ -35,9 +32,7 @@ public class LinearHashFilePresenter {
         }
     }
 
-    // ============================================================
-    // BATCH GENERATE (rovnako ako v HeapFilePresenter)
-    // ============================================================
+
     public void onGenerateBatch() {
         try {
             view.append("\n=== GENERATING " + GEN_COUNT + " PERSONS ===");
@@ -55,9 +50,7 @@ public class LinearHashFilePresenter {
         }
     }
 
-    // ============================================================
-    // FIND
-    // ============================================================
+
     public void onFind() {
         try {
             String id = JOptionPane.showInputDialog("Enter ID:");
@@ -78,9 +71,7 @@ public class LinearHashFilePresenter {
         }
     }
 
-    // ============================================================
-    // DELETE
-    // ============================================================
+
     public void onDelete() {
         try {
             String id = JOptionPane.showInputDialog("Enter ID to delete:");
@@ -101,9 +92,7 @@ public class LinearHashFilePresenter {
         }
     }
 
-    // ============================================================
-    // PRINT
-    // ============================================================
+
     public void onPrint() {
         try {
             view.append("\n===== LinearHashFile CONTENT =====");
@@ -113,9 +102,7 @@ public class LinearHashFilePresenter {
         }
     }
 
-    // ============================================================
-    // CLOSE
-    // ============================================================
+
     public void onClose() {
         try {
             hashFile.close();
@@ -125,9 +112,6 @@ public class LinearHashFilePresenter {
         }
     }
 
-    // ============================================================
-    // HELPERS
-    // ============================================================
     private void error(String msg, Exception e) {
         e.printStackTrace();
         JOptionPane.showMessageDialog(null,

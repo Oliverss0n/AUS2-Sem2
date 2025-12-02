@@ -109,33 +109,24 @@ public class Tester {
 
             int choice = rnd.nextInt(100);
 
-            // ========================================
-            // INSERT
-            // ========================================
+
             if (choice < insertPercent) {
 
                 Person p = randomPerson();
                 lhf.insert(p);
                 model.add(p);
             }
-
-            // ========================================
-            // DELETE
-            // ========================================
             else if (choice < insertPercent + deletePercent) {
 
                 if (!model.isEmpty()) {
                     int idx = rnd.nextInt(model.size());
                     Person p = model.get(idx);
 
-                    //lhf.delete(p);       // delete by pattern
-                    model.remove(idx);   // remove from reference model
+                    //lhf.delete(p);
+                    model.remove(idx);
                 }
             }
 
-            // ========================================
-            // FIND
-            // ========================================
             else {
 
                 if (!model.isEmpty()) {
@@ -150,15 +141,11 @@ public class Tester {
                 }
             }
 
-            // ========================================
-            // VALIDATE PERIODICALLY
-            // ========================================
             if (op % checkInterval == 0) {
                 validateWholeLinearHash(lhf, model);
             }
         }
 
-        // final validation
         validateWholeLinearHash(lhf, model);
     }
 
@@ -180,7 +167,7 @@ public class Tester {
             }
 
             long next = block.getNext();
-            while (next != -1) {  // ✅ OPRAVENÉ
+            while (next != -1) {
                 Block<Person> ov = lhf.getOverflowFile().readBlock(next);
                 for (int j = 0; j < ov.getValidCount(); j++) {
                     actual.add(ov.getList().get(j));
@@ -225,7 +212,6 @@ public class Tester {
     public static void ultimateLinearHashValidation(LinearHashFile<Person> lhf,
                                                     ArrayList<Person> model) throws Exception {
 
-        System.out.println("\n=== ULTIMATE LH VALIDATION START ===");
 
         int M = lhf.getM();
         int u = lhf.getU();
@@ -234,33 +220,26 @@ public class Tester {
         int groups = S + M * (int)Math.pow(2, u);
         int blockSize = lhf.getMainFile().getBlockSize();
 
-        // Zozbierame realitu
         ArrayList<Person> actual = new ArrayList<>();
 
-        // mapovanie bucket → záznamy
         ArrayList<ArrayList<Person>> bucketMap = new ArrayList<>();
         for (int i = 0; i < groups; i++) {
             bucketMap.add(new ArrayList<>());
         }
 
-        // ==============================================
-        // 1. Prejdi všetky primárne bloky a overflow
-        // ==============================================
         for (int i = 0; i < groups; i++) {
 
             long addr = (long) i * blockSize;
             Block<Person> block = lhf.getMainFile().readBlock(addr);
 
-            // primárne záznamy
             for (int j = 0; j < block.getValidCount(); j++) {
                 Person p = block.getList().get(j);
                 actual.add(p);
                 bucketMap.get(i).add(p);
             }
 
-            // overflow reťazec
             long next = block.getNext();
-            HashSet<Long> visited = new HashSet<>();  // detekcia cyklu
+            HashSet<Long> visited = new HashSet<>();
 
             while (next != -1) {
 
@@ -281,21 +260,15 @@ public class Tester {
         }
 
 
-        // ==============================================
-        // 2. Skontroluj počet záznamov
-        // ==============================================
         if (model.size() != actual.size()) {
             throw new RuntimeException("COUNT MISMATCH: expected=" + model.size() +
                     " actual=" + actual.size());
         }
 
 
-        // ==============================================
-        // 3. Skontroluj, že každý záznam je v správnom buckete
-        // ==============================================
         for (Person p : model) {
             int key = p.getHashCode();
-            int idx = computeIndexManual(key, M, S, u); // manuálne vypočítame
+            int idx = computeIndexManual(key, M, S, u);
 
             boolean ok = false;
             for (Person stored : bucketMap.get(idx)) {
@@ -314,10 +287,6 @@ public class Tester {
             }
         }
 
-
-        // ==============================================
-        // 4. Kontrola súvislosti overflow reťazcov
-        // ==============================================
         for (int i = 0; i < groups; i++) {
 
             long addr = (long) i * blockSize;
@@ -330,7 +299,6 @@ public class Tester {
                         " has next=0 (must be -1 or valid addr)");
             }
 
-            // všetky visited overflow na overenie sirot
             HashSet<Long> seen = new HashSet<>();
 
             while (next != -1) {
@@ -350,8 +318,6 @@ public class Tester {
             }
         }
 
-        System.out.println("ULTIMATE VALIDATION PASSED ✓✓✓");
-        System.out.println("=== ULTIMATE LH VALIDATION END ===\n");
     }
 
 
@@ -361,24 +327,19 @@ public class Tester {
                                             int checks) throws Exception {
 
 
-        System.out.println("╔════════════════════════════════════════╗");
-        System.out.println("║  TEST STARTED WITH SEED: " + SEED);
-        System.out.println("║  To reproduce: change SEED in Tester.java");
-        System.out.println("╚════════════════════════════════════════╝\n");
+        System.out.println("===========================================");
+        System.out.println("TEST STARTED WITH SEED: " + SEED);
+        System.out.println("===========================================");
 
         ArrayList<Person> model = new ArrayList<>();
 
-        // ==========================================
-        // INSERT TEST s periodickou validáciou
-        // ==========================================
+
         for (int i = 0; i < inserts; i++) {
             Person p = randomPerson();
             lhf.insert(p);
             model.add(p);
 
-            // ✅ Validuj každých 100 insertov
             if ((i + 1) % 10 == 0) {
-                System.out.println("Validating after " + (i + 1) + " inserts...");
                 ultimateLinearHashValidation(lhf, model);
             }
         }
@@ -386,9 +347,6 @@ public class Tester {
         System.out.println("INSERT DONE, inserted = " + inserts);
         System.out.println(lhf.print());
 
-        // ==========================================
-        // FIND TEST
-        // ==========================================
         for (int i = 0; i < checks; i++) {
             Person expected = model.get(rnd.nextInt(model.size()));
             Person found = lhf.find(expected);
@@ -403,7 +361,6 @@ public class Tester {
 
         System.out.println("FIND OK (" + checks + " random finds)");
 
-        // ✅ Finálna validácia
         ultimateLinearHashValidation(lhf, model);
     }
 
@@ -413,13 +370,11 @@ public class Tester {
         System.out.println("        LINEAR HASH MEGA TEST");
         System.out.println("========================================");
 
-        // ZMAŽ STARÉ SÚBORY
         new File("main.bin").delete();
         new File("main.bin.meta").delete();
         new File("ov.bin").delete();
         new File("ov.bin.meta").delete();
 
-        // Inicializácia LH
         LinearHashFile<Person> lhf =
                 new LinearHashFile<>("main.bin", 256, "ov.bin", 256, 4, new Person());
 
@@ -430,10 +385,9 @@ public class Tester {
 
         for (int i = 1; i <= N; i++) {
 
-            Person p = randomPerson();  // ✔ používa tvoju metódu
+            Person p = randomPerson();
             lhf.insert(p);
 
-            // log každých 50k
             if (i % 50_000 == 0) {
                 System.out.println("Inserted: " + i +
                         " | groups=" + (lhf.getS() + lhf.getM() * (int)Math.pow(2, lhf.getU())) +
@@ -455,12 +409,7 @@ public class Tester {
 
         lhf.close();
 
-        System.out.println("========================================");
-        System.out.println("           MEGA TEST DONE");
-        System.out.println("========================================");
     }
-
-
 
 
     private static Person randomPerson() {

@@ -14,7 +14,7 @@ public class Main {
 
     private static final boolean TEST_HEAPFILE = false;
     private static final boolean TEST_LINEAR_HASH = true;
-    private static final boolean USE_TESTER = true;   // ← sem si dáš ON/OFF
+    private static final boolean USE_TESTER = true;
 
     public static void main(String[] args) {
 
@@ -28,9 +28,7 @@ public class Main {
         }
     }
 
-    // ==============================================
-    // HEAPFILE GUI
-    // ==============================================
+
     private static void runHeapGUI() {
 
         javax.swing.SwingUtilities.invokeLater(() -> {
@@ -55,9 +53,6 @@ public class Main {
         });
     }
 
-    // ==============================================
-    // LINEAR HASHFILE GUI
-    // ==============================================
     private static void runLinearHashGUI() {
 
         javax.swing.SwingUtilities.invokeLater(() -> {
@@ -82,7 +77,7 @@ public class Main {
                 }*/
 
                 if (USE_TESTER) {
-                    Tester.simpleInsertFindTest(lhf, 100, 1000);
+                    Tester.simpleInsertFindTest(lhf, 100, 1000000);
                     //Tester.megaTest();
 
                 }
@@ -100,13 +95,10 @@ public class Main {
         });
     }
 
-    // ==============================================
-    // DELETE FILES
-    // ==============================================
     private static void deleteFiles() {
         delete("data.bin");
         delete("data.bin.meta");
-        delete("data.bin.lh.meta");     // ✅ PRIDAJ TOTO!
+        delete("data.bin.lh.meta");
         delete("overflow.bin");
         delete("overflow.bin.meta");
     }

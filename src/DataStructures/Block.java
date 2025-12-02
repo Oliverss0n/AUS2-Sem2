@@ -33,7 +33,7 @@ public class Block<T extends IRecord<T>> {
         return list;
     }
 
-    /*
+    /* bez next
     public ArrayList<Byte> getBytes() {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         DataOutputStream dos = new DataOutputStream(bos);
@@ -80,7 +80,6 @@ public class Block<T extends IRecord<T>> {
 
             dos.writeInt(this.validCount);
 
-            // 🔥 NEW: zapíš next pointer
             dos.writeLong(this.next);
 
         } catch (IOException e) {
@@ -151,7 +150,6 @@ public class Block<T extends IRecord<T>> {
 
             this.validCount = dis.readInt();
 
-            // 🔥 NEW: prečítaj next pointer
             this.next = dis.readLong();
 
         } catch (IOException e) {
