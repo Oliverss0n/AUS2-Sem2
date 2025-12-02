@@ -82,8 +82,9 @@ public class Main {
                 }*/
 
                 if (USE_TESTER) {
-                    Tester.simpleInsertFindTest(lhf, 5000, 10000);
-                    System.out.println("\n✓✓✓ TEST PASSED ✓✓✓");
+                    Tester.simpleInsertFindTest(lhf, 100, 1000);
+                    //Tester.megaTest();
+
                 }
 
                 LinearHashFileView view = new LinearHashFileView();

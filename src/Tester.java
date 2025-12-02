@@ -3,6 +3,7 @@ import DataStructures.HeapFile;
 import DataStructures.LinearHashFile;
 import Model.Person;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Random;
@@ -405,6 +406,60 @@ public class Tester {
         // ✅ Finálna validácia
         ultimateLinearHashValidation(lhf, model);
     }
+
+    public static void megaTest() throws Exception {
+
+        System.out.println("========================================");
+        System.out.println("        LINEAR HASH MEGA TEST");
+        System.out.println("========================================");
+
+        // ZMAŽ STARÉ SÚBORY
+        new File("main.bin").delete();
+        new File("main.bin.meta").delete();
+        new File("ov.bin").delete();
+        new File("ov.bin.meta").delete();
+
+        // Inicializácia LH
+        LinearHashFile<Person> lhf =
+                new LinearHashFile<>("main.bin", 256, "ov.bin", 256, 4, new Person());
+
+        final int N = 1_000_000;
+        Random r = new Random(12345);
+
+        long start = System.currentTimeMillis();
+
+        for (int i = 1; i <= N; i++) {
+
+            Person p = randomPerson();  // ✔ používa tvoju metódu
+            lhf.insert(p);
+
+            // log každých 50k
+            if (i % 50_000 == 0) {
+                System.out.println("Inserted: " + i +
+                        " | groups=" + (lhf.getS() + lhf.getM() * (int)Math.pow(2, lhf.getU())) +
+                        " | S=" + lhf.getS() +
+                        " | u=" + lhf.getU());
+            }
+        }
+
+        long end = System.currentTimeMillis();
+
+        System.out.println("\n=========== MEGA TEST FINISHED ===========");
+        System.out.println("Inserted total: " + N);
+        System.out.println("Time: " + (end - start) + " ms");
+        System.out.println("Final S=" + lhf.getS());
+        System.out.println("Final u=" + lhf.getU());
+        System.out.println("Primary groups=" + (lhf.getS() + lhf.getM() * (int)Math.pow(2, lhf.getU())));
+        System.out.println("Main file length=" + lhf.getMainFile().getFileLength());
+        System.out.println("Overflow file length=" + lhf.getOverflowFile().getFileLength());
+
+        lhf.close();
+
+        System.out.println("========================================");
+        System.out.println("           MEGA TEST DONE");
+        System.out.println("========================================");
+    }
+
 
 
 
