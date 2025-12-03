@@ -16,7 +16,6 @@ public class HeapFile<T extends IRecord<T>> {
     private ArrayList<Long> partialBlocks;
     private T prototype;
 
-    private boolean isOverflow;
 
     public HeapFile(String path, int blockSize, T prototype) throws Exception {
         this.path = path;
@@ -34,10 +33,7 @@ public class HeapFile<T extends IRecord<T>> {
         this.raf = new RandomAccessFile(path, "rw");
 
         this.loadMetadata();
-        if (isOverflow && raf.length() == 0) {
-            Block<T> dummy = emptyBlock();
-            writeBlock(0, dummy);
-        }
+
     }
 
 
@@ -67,7 +63,7 @@ public class HeapFile<T extends IRecord<T>> {
         }
         Block<T> block = new Block<>(blockFactor, prototype, list);
         block.setValidCount(0);
-        block.setNext(-1);          // 👈 DOPLŇ TOTO
+        block.setNext(-1);
         return block;
     }
 
@@ -208,35 +204,32 @@ public class HeapFile<T extends IRecord<T>> {
         block.fromBytes(list);
         return block;
     }*/
-public Block<T> readBlock(long addr) throws Exception {
+    public Block<T> readBlock(long addr) throws Exception {
 
-    raf.seek(addr);
-    byte[] raw = new byte[blockSize];
-    raf.read(raw);
+        raf.seek(addr);
+        byte[] raw = new byte[blockSize];
+        raf.read(raw);
 
-    DataInputStream dis = new DataInputStream(new ByteArrayInputStream(raw));
+        DataInputStream dis = new DataInputStream(new ByteArrayInputStream(raw));
 
-    Block<T> block = emptyBlock();
+        Block<T> block = emptyBlock();
 
-    // 1) read validCount
-    block.setValidCount(dis.readInt());
+        block.setValidCount(dis.readInt());
 
-    // 2) read next pointer
-    block.setNext(dis.readLong());
+        block.setNext(dis.readLong());
 
-    // 3) read all T records
-    for (int i = 0; i < blockFactor; i++) {
-        ArrayList<Byte> bytes = new ArrayList<>();
-        for (int j = 0; j < prototype.getSize(); j++) {
-            bytes.add(dis.readByte());
+        for (int i = 0; i < blockFactor; i++) {
+            ArrayList<Byte> bytes = new ArrayList<>();
+            for (int j = 0; j < prototype.getSize(); j++) {
+                bytes.add(dis.readByte());
+            }
+            T rec = (T) prototype.getClass().newInstance();
+            rec.fromBytes(bytes);
+            block.getList().set(i, rec);
         }
-        T rec = (T) prototype.getClass().newInstance();
-        rec.fromBytes(bytes);
-        block.getList().set(i, rec);
-    }
 
-    return block;
-}
+        return block;
+    }
 
 
     /*
@@ -256,19 +249,15 @@ public Block<T> readBlock(long addr) throws Exception {
         raf.write(raw);
     } */
 
-    //checknut este
     public void writeBlock(long addr, Block<T> block) throws Exception {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         DataOutputStream dos = new DataOutputStream(baos);
 
-        // 1) validCount
         dos.writeInt(block.getValidCount());
 
-        // 2) next pointer
         dos.writeLong(block.getNext());
 
-        // 3) T records
         for (int i = 0; i < blockFactor; i++) {
             ArrayList<Byte> bytes = block.getList().get(i).getBytes();
             for (byte b : bytes)
@@ -277,7 +266,6 @@ public Block<T> readBlock(long addr) throws Exception {
 
         byte[] tmp = baos.toByteArray();
 
-        // ---- SAFE PADDING ----
         byte[] finalBytes = new byte[blockSize];
 
         int limit = Math.min(tmp.length, blockSize);
@@ -285,19 +273,12 @@ public Block<T> readBlock(long addr) throws Exception {
             finalBytes[i] = tmp[i];
         }
 
-        // zvyšok necháme 0
-        // ----------------------
 
         raf.seek(addr);
         raf.write(finalBytes);
     }
 
 
-
-
-
-
-    //este neotestovane, len napad na implementaciu
     private void saveMetadata() throws Exception {
         PrintWriter pw = new PrintWriter(metaPath);
 
@@ -421,52 +402,14 @@ public Block<T> readBlock(long addr) throws Exception {
         raf.setLength(newSize);
     }
 
-    /*
-    public void shrinkFileCompletely() throws Exception {
-
+    public void shrinkFileLH() throws Exception {
         long fileLen = raf.length();
-        if (fileLen == 0) return;
-
-        // Prechádzaj od konca a škrtaj prázdne bloky
-        while (fileLen > 0) {
-            long lastBlockAddr = fileLen - blockSize;
-            if (lastBlockAddr < 0) break;
-
-            Block<T> block = readBlock(lastBlockAddr);
-
-            if (block.getValidCount() == 0) {
-                // Prázdny blok - odsekni ho
-                fileLen -= blockSize;
-            } else {
-                // Našli sme neprázdny blok - koniec
-                break;
-            }
+        if (fileLen == 0) {
+            return;
         }
 
-        // Nastav novú dĺžku súboru
-        raf.setLength(fileLen);
+        long minSize = blockSize;
 
-        // Vyčisti freeBlocks - odstráň adresy >= novej dĺžky
-        int i = 0;
-        while (i < freeBlocks.size()) {
-            if (freeBlocks.get(i) >= fileLen) {
-                freeBlocks.remove(i);
-            } else {
-                i++;
-            }
-        }
-
-    }*/
-
-    public void shrinkFileCompletely() throws Exception {
-        long fileLen = raf.length();
-        if (fileLen == 0) return;
-
-        // ✅ KRITICKÉ: Ak je toto overflow file, chráň prvý blok
-        // (pozná sa podľa toho, že sa volá shrinkFileCompletely)
-        long minSize = blockSize;  // Rezervovaný dummy blok na addr=0
-
-        // Prechádzaj od konca a škrtaj prázdne bloky
         while (fileLen > minSize) {
             long lastBlockAddr = fileLen - blockSize;
             if (lastBlockAddr < 0) break;
@@ -480,10 +423,8 @@ public Block<T> readBlock(long addr) throws Exception {
             }
         }
 
-        // Nastav novú dĺžku (minimálne 1 blok pre overflow)
         raf.setLength(Math.max(fileLen, minSize));
 
-        // Vyčisti freeBlocks
         int i = 0;
         while (i < freeBlocks.size()) {
             if (freeBlocks.get(i) >= fileLen) {

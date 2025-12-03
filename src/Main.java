@@ -77,7 +77,7 @@ public class Main {
                 }*/
 
                 if (USE_TESTER) {
-                    Tester.simpleInsertFindTest(lhf, 100, 1000000);
+                    Tester.simpleInsertFindTest(lhf, 1000, 10000);
                     //Tester.megaTest();
 
                 }
@@ -103,6 +103,10 @@ public class Main {
         delete("overflow.bin.meta");
     }
     private static void delete(String path) {
-        try { new File(path).delete(); } catch (Exception ignored) {}
+        try {
+            new File(path).delete();
+        } catch (Exception e) {
+
+        }
     }
 }
