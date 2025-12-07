@@ -43,9 +43,11 @@ public class LinearHashFileView extends JFrame {
         btnInsert.addActionListener(e -> presenter.onInsert());
         btnFind.addActionListener(e -> presenter.onFind());
         btnDelete.addActionListener(e -> presenter.onDelete());
+        btnUpdate.addActionListener(e -> presenter.onUpdate());
         btnPrint.addActionListener(e -> presenter.onPrint());
         btnClose.addActionListener(e -> presenter.onClose());
     }
+
 
     public void append(String msg) {
         txtOutput.append(msg + "\n");

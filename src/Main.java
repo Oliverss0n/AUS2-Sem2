@@ -1,13 +1,17 @@
+import Model.MainModel;
 import Presenter.HeapFilePresenter;
 import Presenter.LinearHashFilePresenter;
 
+import Presenter.MainPresenter;
 import View.HeapFileView;
 import View.LinearHashFileView;
 
 import Model.Person;
 import DataStructures.HeapFile;
 import DataStructures.LinearHashFile;
+import View.MainView;
 
+import javax.swing.*;
 import java.io.File;
 
 public class Main {
@@ -18,6 +22,7 @@ public class Main {
 
     public static void main(String[] args) {
 
+/*
         deleteFiles();
 
         if (TEST_HEAPFILE) {
@@ -25,7 +30,21 @@ public class Main {
         }
         else if (TEST_LINEAR_HASH) {
             runLinearHashGUI();
-        }
+        }*/
+
+        SwingUtilities.invokeLater(() -> {
+            try {
+                MainModel model = new MainModel();
+                MainView view = new MainView();
+                new MainPresenter(view, model);
+
+                view.setVisible(true);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+
     }
 
 
@@ -77,8 +96,7 @@ public class Main {
                 }*/
 
                 if (USE_TESTER) {
-                    Tester.simpleInsertFindTest(lhf, 1000, 10000);
-                    //Tester.megaTest();
+                    Tester.simpleInsertFindTest(lhf, 100, 10000);
 
                 }
 

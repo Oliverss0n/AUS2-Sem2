@@ -188,22 +188,24 @@ public class HeapFile<T extends IRecord<T>> {
 
 
 
-/*
-    public Block<T> readBlock(long addr) throws Exception {
-        byte[] buf = new byte[this.blockSize];
+    /*
+        public Block<T> readBlock(long addr) throws Exception {
+            byte[] buf = new byte[this.blockSize];
 
-        raf.seek(addr);
-        raf.read(buf);
+            raf.seek(addr);
+            raf.read(buf);
 
-        ArrayList<Byte> list = new ArrayList<>(this.blockSize);
-        for (byte prvok : buf) {
-            list.add(prvok);
-        }
+            ArrayList<Byte> list = new ArrayList<>(this.blockSize);
+            for (byte prvok : buf) {
+                list.add(prvok);
+            }
 
-        Block<T> block = emptyBlock();
-        block.fromBytes(list);
-        return block;
-    }*/
+            Block<T> block = emptyBlock();
+            block.fromBytes(list);
+            return block;
+        }*/
+
+    /* --najaktualnejsie
     public Block<T> readBlock(long addr) throws Exception {
 
         raf.seek(addr);
@@ -229,6 +231,22 @@ public class HeapFile<T extends IRecord<T>> {
         }
 
         return block;
+    }*/
+    public Block<T> readBlock(long addr) throws Exception {
+        raf.seek(addr);
+        byte[] raw = new byte[blockSize];
+        raf.read(raw);
+
+        // ✅ Použijeme Block.fromBytes()
+        ArrayList<Byte> byteList = new ArrayList<>(blockSize);
+        for (byte b : raw) {
+            byteList.add(b);
+        }
+
+        Block<T> block = emptyBlock();
+        block.fromBytes(byteList);
+
+        return block;
     }
 
 
@@ -249,6 +267,7 @@ public class HeapFile<T extends IRecord<T>> {
         raf.write(raw);
     } */
 
+    /*--najaktualnejsie
     public void writeBlock(long addr, Block<T> block) throws Exception {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -273,6 +292,24 @@ public class HeapFile<T extends IRecord<T>> {
             finalBytes[i] = tmp[i];
         }
 
+
+        raf.seek(addr);
+        raf.write(finalBytes);
+    }*/
+
+    public void writeBlock(long addr, Block<T> block) throws Exception {
+        // ✅ Použijeme Block.getBytes()
+        ArrayList<Byte> byteList = block.getBytes();
+
+        byte[] finalBytes = new byte[blockSize];
+
+        // Skopírujeme dáta z Block.getBytes()
+        int limit = Math.min(byteList.size(), blockSize);
+        for (int i = 0; i < limit; i++) {
+            finalBytes[i] = byteList.get(i);
+        }
+
+        // Zvyšok vyplníme nulami (už je default)
 
         raf.seek(addr);
         raf.write(finalBytes);

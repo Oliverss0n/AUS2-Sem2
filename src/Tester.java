@@ -209,8 +209,8 @@ public class Tester {
         return i;
     }
 
-    public static void ultimateLinearHashValidation(LinearHashFile<Person> lhf,
-                                                    ArrayList<Person> model) throws Exception {
+    public static void linearHashValidation(LinearHashFile<Person> lhf,
+                                            ArrayList<Person> model) throws Exception {
 
 
         int M = lhf.getM();
@@ -328,7 +328,7 @@ public class Tester {
 
 
         System.out.println("===========================================");
-        System.out.println("TEST STARTED WITH SEED: " + SEED);
+        System.out.println("    TEST STARTED WITH SEED: " + SEED);
         System.out.println("===========================================");
 
         ArrayList<Person> model = new ArrayList<>();
@@ -340,7 +340,7 @@ public class Tester {
             model.add(p);
 
             if ((i + 1) % 10 == 0) {
-                ultimateLinearHashValidation(lhf, model);
+                linearHashValidation(lhf, model);
             }
         }
 
@@ -361,56 +361,8 @@ public class Tester {
 
         System.out.println("FIND OK (" + checks + " random finds)");
 
-        ultimateLinearHashValidation(lhf, model);
+        linearHashValidation(lhf, model);
     }
-
-    public static void megaTest() throws Exception {
-
-        System.out.println("========================================");
-        System.out.println("        LINEAR HASH MEGA TEST");
-        System.out.println("========================================");
-
-        new File("main.bin").delete();
-        new File("main.bin.meta").delete();
-        new File("ov.bin").delete();
-        new File("ov.bin.meta").delete();
-
-        LinearHashFile<Person> lhf =
-                new LinearHashFile<>("main.bin", 256, "ov.bin", 256, 4, new Person());
-
-        final int N = 1_000_000;
-        Random r = new Random(12345);
-
-        long start = System.currentTimeMillis();
-
-        for (int i = 1; i <= N; i++) {
-
-            Person p = randomPerson();
-            lhf.insert(p);
-
-            if (i % 50_000 == 0) {
-                System.out.println("Inserted: " + i +
-                        " | groups=" + (lhf.getS() + lhf.getM() * (int)Math.pow(2, lhf.getU())) +
-                        " | S=" + lhf.getS() +
-                        " | u=" + lhf.getU());
-            }
-        }
-
-        long end = System.currentTimeMillis();
-
-        System.out.println("\n=========== MEGA TEST FINISHED ===========");
-        System.out.println("Inserted total: " + N);
-        System.out.println("Time: " + (end - start) + " ms");
-        System.out.println("Final S=" + lhf.getS());
-        System.out.println("Final u=" + lhf.getU());
-        System.out.println("Primary groups=" + (lhf.getS() + lhf.getM() * (int)Math.pow(2, lhf.getU())));
-        System.out.println("Main file length=" + lhf.getMainFile().getFileLength());
-        System.out.println("Overflow file length=" + lhf.getOverflowFile().getFileLength());
-
-        lhf.close();
-
-    }
-
 
 
     private static Person randomPerson() {

@@ -64,6 +64,7 @@ public class Block<T extends IRecord<T>> {
         return result;
     }*/
 
+    /* --najaktualnejsie
     public ArrayList<Byte> getBytes() {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         DataOutputStream dos = new DataOutputStream(bos);
@@ -94,7 +95,35 @@ public class Block<T extends IRecord<T>> {
         }
 
         return result;
+    }*/
+
+    public ArrayList<Byte> getBytes() {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(bos);
+
+        try {
+            // 1) validCount
+            dos.writeInt(this.validCount);
+
+            // 2) next pointer
+            dos.writeLong(this.next);
+
+            // 3) all records
+            for (int i = 0; i < this.blockFactor; i++) {
+                ArrayList<Byte> rec = list.get(i).getBytes();
+                for (byte b : rec) dos.writeByte(b);
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        byte[] raw = bos.toByteArray();
+        ArrayList<Byte> out = new ArrayList<>(raw.length);
+        for (byte b : raw) out.add(b);
+        return out;
     }
+
 
 
 
@@ -127,9 +156,12 @@ public class Block<T extends IRecord<T>> {
         }
     }*/
 
+    /* -- najaktualnejsie
     public void fromBytes(ArrayList<Byte> bytes) {
         byte[] raw = new byte[bytes.size()];
-        for (int i = 0; i < bytes.size(); i++) raw[i] = bytes.get(i);
+        for (int i = 0; i < bytes.size(); i++) {
+            raw[i] = bytes.get(i);
+        }
 
         ByteArrayInputStream bis = new ByteArrayInputStream(raw);
         DataInputStream dis = new DataInputStream(bis);
@@ -155,7 +187,40 @@ public class Block<T extends IRecord<T>> {
         } catch (IOException e) {
             throw new RuntimeException("chyba v fromBytes", e);
         }
+    }*/
+
+    public void fromBytes(ArrayList<Byte> bytes) {
+
+        byte[] raw = new byte[bytes.size()];
+        for (int i = 0; i < bytes.size(); i++) raw[i] = bytes.get(i);
+
+        DataInputStream dis = new DataInputStream(new ByteArrayInputStream(raw));
+
+        try {
+            // 1) validCount
+            this.validCount = dis.readInt();
+
+            // 2) next pointer
+            this.next = dis.readLong();
+
+            // 3) records
+            int recSize = prototype.getSize();
+
+            for (int i = 0; i < blockFactor; i++) {
+                byte[] tmp = new byte[recSize];
+                dis.readFully(tmp);
+
+                ArrayList<Byte> arr = new ArrayList<>();
+                for (byte b : tmp) arr.add(b);
+
+                list.get(i).fromBytes(arr);
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
+
 
 
     public long getNext() { return next; }
