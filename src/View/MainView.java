@@ -26,9 +26,7 @@ public class MainView extends JFrame implements IMainView {
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
 
-        // --------------------------------------
-        // TOP PANEL (Generate, Close, Print)
-        // --------------------------------------
+
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
 
         btnGenerate = new JButton("Generovať dáta");
@@ -45,19 +43,14 @@ public class MainView extends JFrame implements IMainView {
 
         add(top, BorderLayout.NORTH);
 
-        // --------------------------------------
-        // OUTPUT AREA
-        // --------------------------------------
+
         outputArea = new JTextArea();
         outputArea.setFont(new Font("Consolas", Font.PLAIN, 13));
         outputArea.setEditable(false);
         add(new JScrollPane(outputArea), BorderLayout.CENTER);
 
-        // --------------------------------------
-        // LEFT SIDE — TASK BUTTONS
-        // --------------------------------------
+
         JPanel left = new JPanel(new GridLayout(0, 1, 5, 5));
-        left.setBorder(BorderFactory.createTitledBorder("Operácie (1–8)"));
 
         String[] ops = {
                 "1. Vložiť test",
@@ -97,9 +90,7 @@ public class MainView extends JFrame implements IMainView {
         }
     }
 
-    // --------------------------------------
-    // TABLE POPUP
-    // --------------------------------------
+
     @Override
     public void showTable(String title, String[] columns, List<Object[]> rows) {
 
@@ -123,9 +114,7 @@ public class MainView extends JFrame implements IMainView {
         );
     }
 
-    // --------------------------------------
-    // OUTPUT TEXT AREA
-    // --------------------------------------
+
     @Override
     public void showOutput(String text) {
         outputArea.setText(text != null ? text : "");
@@ -136,9 +125,6 @@ public class MainView extends JFrame implements IMainView {
         outputArea.append((text != null ? text : "") + "\n");
     }
 
-    // --------------------------------------
-    // INPUT + MESSAGES
-    // --------------------------------------
     @Override
     public String promptInput(String msg) {
         return JOptionPane.showInputDialog(this, msg);

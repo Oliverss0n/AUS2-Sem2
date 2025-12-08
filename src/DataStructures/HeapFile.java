@@ -237,7 +237,6 @@ public class HeapFile<T extends IRecord<T>> {
         byte[] raw = new byte[blockSize];
         raf.read(raw);
 
-        // ✅ Použijeme Block.fromBytes()
         ArrayList<Byte> byteList = new ArrayList<>(blockSize);
         for (byte b : raw) {
             byteList.add(b);
@@ -298,18 +297,15 @@ public class HeapFile<T extends IRecord<T>> {
     }*/
 
     public void writeBlock(long addr, Block<T> block) throws Exception {
-        // ✅ Použijeme Block.getBytes()
         ArrayList<Byte> byteList = block.getBytes();
 
         byte[] finalBytes = new byte[blockSize];
 
-        // Skopírujeme dáta z Block.getBytes()
         int limit = Math.min(byteList.size(), blockSize);
         for (int i = 0; i < limit; i++) {
             finalBytes[i] = byteList.get(i);
         }
 
-        // Zvyšok vyplníme nulami (už je default)
 
         raf.seek(addr);
         raf.write(finalBytes);

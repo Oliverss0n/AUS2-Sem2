@@ -22,7 +22,6 @@ public class LinearHashFilePresenter {
         this.hashFile = hashFile;
     }
 
-    // =============== INSERT ==================
     public void onInsert() {
         try {
             Person p = randomPerson();
@@ -33,7 +32,6 @@ public class LinearHashFilePresenter {
         }
     }
 
-    // =============== FIND ==================
     public void onFind() {
         try {
             String id = JOptionPane.showInputDialog("Enter ID:");
@@ -54,7 +52,6 @@ public class LinearHashFilePresenter {
         }
     }
 
-    // =============== UPDATE ==================
     public void onUpdate() {
         try {
             String id = JOptionPane.showInputDialog("Enter ID to update:");
@@ -63,7 +60,7 @@ public class LinearHashFilePresenter {
             Person pattern = new Person();
             pattern.fromId(id);
 
-            Person newData = randomPerson(); // alebo vyvolať ďalšie okno
+            Person newData = randomPerson();
 
             boolean ok = hashFile.update(pattern, newData);
 
@@ -77,7 +74,6 @@ public class LinearHashFilePresenter {
         }
     }
 
-    // =============== DELETE ==================
     public void onDelete() {
         try {
             String id = JOptionPane.showInputDialog("Enter ID to delete:");
@@ -86,7 +82,7 @@ public class LinearHashFilePresenter {
             Person pattern = new Person();
             pattern.fromId(id);
 
-            boolean ok = hashFile.delete(pattern); // momentálne false
+            boolean ok = hashFile.delete(pattern);
 
             if (ok)
                 view.append("DELETED: " + id);
@@ -98,7 +94,6 @@ public class LinearHashFilePresenter {
         }
     }
 
-    // =============== PRINT ==================
     public void onPrint() {
         try {
             view.append("\n===== LinearHashFile CONTENT =====");
@@ -108,7 +103,6 @@ public class LinearHashFilePresenter {
         }
     }
 
-    // =============== CLOSE ==================
     public void onClose() {
         try {
             hashFile.close();
@@ -117,8 +111,6 @@ public class LinearHashFilePresenter {
             error("Close failed", e);
         }
     }
-
-    // =============== HELPERS ===============
 
     private void error(String msg, Exception e) {
         e.printStackTrace();

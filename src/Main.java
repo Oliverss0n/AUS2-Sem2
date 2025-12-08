@@ -87,11 +87,11 @@ public class Main {
                 /*if (USE_TESTER) {
                     Tester.mixedLinearHashTest(
                             lhf,
-                            8000,  // operations
-                            50,    // inserts
-                            25,    // deletes
-                            25,    // finds
-                            100    // validate interval
+                            8000,
+                            50,
+                            25,
+                            25,
+                            100
                     );
                 }*/
 

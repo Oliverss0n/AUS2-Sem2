@@ -35,9 +35,6 @@ public class MainModel {
         );
     }
 
-    // ─────────────────────────────────────────
-    // PERSON OPERATIONS
-    // ─────────────────────────────────────────
 
     public boolean insertPerson(Person p) {
         try {
@@ -89,16 +86,13 @@ public class MainModel {
 
     public boolean editPerson(String id, Person newData) {
         try {
-            // 1️⃣ Načítaj starú osobu (má testCodes)
             Person oldPerson = findPerson(id);
             if (oldPerson == null) return false;
 
-            // 2️⃣ Skopíruj testCodes do novej osoby
             for (int testCode : oldPerson.getTestCodes()) {
                 newData.addTestCode(testCode);
             }
 
-            // 3️⃣ Update - pattern má len ID
             Person pattern = new Person();
             pattern.fromId(id);
 
@@ -109,24 +103,6 @@ public class MainModel {
         }
     }
 
-
-
-
-    public List<Person> generatePersons(int count) {
-        List<Person> out = new ArrayList<>();
-
-        for (int i = 0; i < count; i++) {
-            Person p = randomPerson();
-            out.add(p);
-            try { people.insert(p); } catch (Exception ignored) {}
-        }
-
-        return out;
-    }
-
-    // ─────────────────────────────────────────
-    // TEST OPERATIONS
-    // ─────────────────────────────────────────
 
     /*
     public boolean editTest(int code, PCRTest newData) {
@@ -146,14 +122,11 @@ public class MainModel {
     }*/
     public boolean editTest(int code, PCRTest newData) {
         try {
-            // ✅ Načítaj starý test
             PCRTest oldTest = findTest(code);
             if (oldTest == null) return false;
 
-            // ✅ KRITICKÉ: Zachovaj pôvodný patientId
             newData.setPatientId(oldTest.getPatientId());
 
-            // ✅ Update
             PCRTest pattern = new PCRTest();
             pattern.setTestCode(code);
 
@@ -195,9 +168,6 @@ public class MainModel {
         }
     }
 
-    // ─────────────────────────────────────────
-    // PRINTING
-    // ─────────────────────────────────────────
 
     public String printPeople() {
         try {
@@ -215,9 +185,6 @@ public class MainModel {
         }
     }
 
-    // ─────────────────────────────────────────
-    // GENERATION HELPERS
-    // ─────────────────────────────────────────
 
     public Person randomPerson() {
         String id = "P" + (personIdCounter++);
@@ -235,7 +202,7 @@ public class MainModel {
 
     public Person getRandomPersonSimple() {
         try {
-            String dump = people.print(); // print už máš
+            String dump = people.print();
             String[] lines = dump.split("\n");
 
             List<Person> persons = new ArrayList<>();
@@ -243,8 +210,6 @@ public class MainModel {
             for (String l : lines) {
                 l = l.trim();
                 if (l.isEmpty()) continue;
-                // Očakávame formát z tvojej print metódy:
-                // Meno Priezvisko ID (YYYY-MM-DD)
                 String[] parts = l.split(" ");
                 if (parts.length < 3) continue;
 
@@ -268,7 +233,6 @@ public class MainModel {
         Person p = findPerson(personId);
         if (p == null) return result;
 
-        // Person má zoznam testCodeov
         ArrayList<Integer> testCodes = p.getTestCodes();
 
         for (int code : testCodes) {
@@ -292,9 +256,6 @@ public class MainModel {
         return sb.toString();
     }
 
-    // ─────────────────────────────────────────
-    // CLOSE
-    // ─────────────────────────────────────────
     public void close() {
         try {
             people.close();
@@ -308,7 +269,6 @@ public class MainModel {
 
         System.out.println("=== ŠTART GENEROVANIA ===");
 
-        // 1️⃣ GENERUJ OSOBY
         List<Person> persons = new ArrayList<>();
 
         for (int i = 0; i < personCount; i++) {
@@ -327,37 +287,34 @@ public class MainModel {
         }
 
         if (persons.isEmpty()) {
-            System.out.println("⚠️ Žiadne osoby neboli vložené!");
+            System.out.println("Žiadne osoby neboli vložené!");
             return;
         }
 
-        System.out.println("✅ Vložené osoby: " + persons.size());
+        System.out.println("Vložené osoby: " + persons.size());
 
-        // 2️⃣ GENERUJ TESTY
         int successfulTests = 0;
 
         for (int i = 0; i < testCount; i++) {
             Person patient = persons.get(rnd.nextInt(persons.size()));
 
-            // ✅ NÁHODNÝ DÁTUM A ČAS
-            int year = 2020 + rnd.nextInt(5);    // 2020-2024
-            int month = 1 + rnd.nextInt(12);     // 1-12
-            int day = 1 + rnd.nextInt(28);       // 1-28 (bezpečné pre všetky mesiace)
-            int hour = rnd.nextInt(24);          // 0-23
-            int minute = rnd.nextInt(60);        // 0-59
+            int year = 2020 + rnd.nextInt(5);
+            int month = 1 + rnd.nextInt(12);
+            int day = 1 + rnd.nextInt(28);
+            int hour = rnd.nextInt(24);
+            int minute = rnd.nextInt(60);
 
             PCRTest t = new PCRTest(
                     testIdCounter++,
                     patient.getId(),
-                    year, month, day, hour, minute,  // ✅ NOVÉ - rozdelené polia
+                    year, month, day, hour, minute,
                     rnd.nextBoolean(),
                     1 + rnd.nextInt(100),
                     randomString(1 + rnd.nextInt(10))
             );
 
-            // ✅ Vlož test
+
             if (insertTest(t)) {
-                // ✅ Pridaj testCode do Person + ulož do súboru
                 if (addTestToPerson(patient.getId(), t.getTestCode())) {
                     successfulTests++;
                 }
@@ -374,93 +331,7 @@ public class MainModel {
         );
     }
 
-/*
-    public void generateAllData(int personCount, int testCount, long seed) {
-        Random rnd = new Random(seed);
-        long start = System.currentTimeMillis();
 
-        System.out.println("=== ŠTART GENEROVANIA ===");
-
-        // 1️⃣ GENERUJ OSOBY
-        List<Person> persons = new ArrayList<>();
-
-        for (int i = 0; i < personCount; i++) {
-            Person p = new Person(
-                    randomString(5 + rnd.nextInt(4)),
-                    randomString(6 + rnd.nextInt(5)),
-                    "P" + (personIdCounter++),
-                    1950 + rnd.nextInt(60),
-                    1 + rnd.nextInt(12),
-                    1 + rnd.nextInt(28)
-            );
-
-            if (insertPerson(p)) {
-                persons.add(p);
-            }
-        }
-
-        if (persons.isEmpty()) {
-            System.out.println("⚠️ Žiadne osoby neboli vložené!");
-            return;
-        }
-
-        System.out.println("✅ Vložené osoby: " + persons.size());
-
-        // 2️⃣ GENERUJ TESTY
-        int successfulTests = 0;
-
-        for (int i = 0; i < testCount; i++) {
-            Person patient = persons.get(rnd.nextInt(persons.size()));
-
-            PCRTest t = new PCRTest(
-                    testIdCounter++,
-                    patient.getId(),
-                    System.currentTimeMillis() - rnd.nextInt(1_000_000_000),
-                    rnd.nextBoolean(),
-                    1 + rnd.nextInt(100),
-                    randomString(1 + rnd.nextInt(10))
-            );
-
-            // ✅ Vlož test
-            if (insertTest(t)) {
-                // ✅ Pridaj testCode do Person + ulož do súboru
-                if (addTestToPerson(patient.getId(), t.getTestCode())) {
-                    successfulTests++;
-                }
-            }
-        }
-
-        long end = System.currentTimeMillis();
-
-        System.out.println(
-                "=== GENERÁCIA DOKONČENÁ ===\n" +
-                        "Osôb: " + persons.size() + "\n" +
-                        "Testov: " + successfulTests + " / " + testCount + "\n" +
-                        "Čas: " + (end - start) + " ms\n"
-        );
-    } */
-
-    /*
-    public boolean addTestToPerson(String personId, int testCode) {
-        try {
-            Person p = findPerson(personId);
-            if (p == null) return false;
-
-            if (!p.addTestCode(testCode)) {
-                return false;  // Už má max testov
-            }
-
-            // ✅ Update v súbore
-            Person old = new Person();
-            old.fromId(personId);
-            people.update(old, p);
-
-            return true;
-
-        } catch (Exception e) {
-            return false;
-        }
-    }*/
     public boolean addTestToPerson(String personId, int testCode) {
         try {
             Person p = findPerson(personId);
@@ -481,8 +352,7 @@ public class MainModel {
         }
     }
 
-    public int getNextTestId() {
-        return testIdCounter++;
-    }
+
+
 
 }

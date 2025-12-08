@@ -102,13 +102,10 @@ public class Block<T extends IRecord<T>> {
         DataOutputStream dos = new DataOutputStream(bos);
 
         try {
-            // 1) validCount
             dos.writeInt(this.validCount);
 
-            // 2) next pointer
             dos.writeLong(this.next);
 
-            // 3) all records
             for (int i = 0; i < this.blockFactor; i++) {
                 ArrayList<Byte> rec = list.get(i).getBytes();
                 for (byte b : rec) dos.writeByte(b);
@@ -197,13 +194,10 @@ public class Block<T extends IRecord<T>> {
         DataInputStream dis = new DataInputStream(new ByteArrayInputStream(raw));
 
         try {
-            // 1) validCount
             this.validCount = dis.readInt();
 
-            // 2) next pointer
             this.next = dis.readLong();
 
-            // 3) records
             int recSize = prototype.getSize();
 
             for (int i = 0; i < blockFactor; i++) {

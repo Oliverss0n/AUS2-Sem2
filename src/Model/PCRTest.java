@@ -9,20 +9,18 @@ public class PCRTest implements IRecord<PCRTest> {
     private static final int PATIENT_ID_LEN = 10;
     private static final int NOTE_LEN = 11;
 
-    // Atribúty
-    private int testCode;           // Unikátny kód PCR testu
-    private String patientId;       // ID pacienta
+    private int testCode;
+    private String patientId;
 
-    // ✅ NOVÉ: Dátum a čas rozdelený
     private int year;
     private int month;
     private int day;
     private int hour;
     private int minute;
 
-    private boolean result;         // Výsledok testu
-    private double value;           // Hodnota testu
-    private String note;            // Poznámka
+    private boolean result;
+    private double value;
+    private String note;
 
     public PCRTest() {
         this.testCode = 0;
@@ -37,28 +35,7 @@ public class PCRTest implements IRecord<PCRTest> {
         this.note = "";
     }
 
-    /*
-    public PCRTest(int testCode, String patientId, long timestamp,
-                   boolean result, double value, String note) {
-        this.testCode = testCode;
-        this.patientId = patientId;
 
-        // ✅ Konverzia timestamp na polia (pre spätkovú kompatibilitu s generátorom)
-        java.util.Calendar cal = java.util.Calendar.getInstance();
-        cal.setTimeInMillis(timestamp);
-        this.year = cal.get(java.util.Calendar.YEAR);
-        this.month = cal.get(java.util.Calendar.MONTH) + 1;
-        this.day = cal.get(java.util.Calendar.DAY_OF_MONTH);
-        this.hour = cal.get(java.util.Calendar.HOUR_OF_DAY);
-        this.minute = cal.get(java.util.Calendar.MINUTE);
-
-        this.result = result;
-        this.value = value;
-        this.note = note;
-    }*/
-
-
-    // ✅ NOVÝ konštruktor s rozdelenými poliami
     public PCRTest(int testCode, String patientId, int year, int month, int day,
                    int hour, int minute, boolean result, double value, String note) {
         this.testCode = testCode;
@@ -88,12 +65,10 @@ public class PCRTest implements IRecord<PCRTest> {
 
             dos.writeInt(this.testCode);
 
-            // PATIENT ID
             byte[] idBytes = this.patientId.getBytes();
             dos.write(pad(idBytes, PATIENT_ID_LEN));
             dos.writeByte(Math.min(idBytes.length, PATIENT_ID_LEN));
 
-            // ✅ DATUM A CAS
             dos.writeInt(this.year);
             dos.writeInt(this.month);
             dos.writeInt(this.day);
@@ -103,7 +78,6 @@ public class PCRTest implements IRecord<PCRTest> {
             dos.writeBoolean(this.result);
             dos.writeDouble(this.value);
 
-            // NOTE
             byte[] noteBytes = this.note.getBytes();
             dos.write(pad(noteBytes, NOTE_LEN));
             dos.writeByte(Math.min(noteBytes.length, NOTE_LEN));
@@ -131,13 +105,11 @@ public class PCRTest implements IRecord<PCRTest> {
 
             this.testCode = dis.readInt();
 
-            // PATIENT ID
             byte[] tmp = new byte[PATIENT_ID_LEN];
             dis.readFully(tmp);
             int idReal = dis.readUnsignedByte();
             this.patientId = new String(tmp, 0, idReal);
 
-            // ✅ DATUM A CAS
             this.year = dis.readInt();
             this.month = dis.readInt();
             this.day = dis.readInt();
@@ -147,7 +119,6 @@ public class PCRTest implements IRecord<PCRTest> {
             this.result = dis.readBoolean();
             this.value = dis.readDouble();
 
-            // NOTE
             tmp = new byte[NOTE_LEN];
             dis.readFully(tmp);
             int noteReal = dis.readUnsignedByte();
@@ -181,7 +152,6 @@ public class PCRTest implements IRecord<PCRTest> {
         return new PCRTest(0, "", 0, 0, 0, 0, 0, false, 0.0, "");
     }
 
-    // ✅ Gettery/Settery
     public int getTestCode() { return testCode; }
     public void setTestCode(int testCode) { this.testCode = testCode; }
 

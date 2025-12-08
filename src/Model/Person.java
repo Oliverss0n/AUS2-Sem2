@@ -10,14 +10,13 @@ public class Person implements IRecord<Person> {
     private static final int NAME_LEN = 15;
     private static final int SURNAME_LEN = 14;
     private static final int ID_LEN = 10;
-    private static final int MAX_TESTS = 6;  // ← NOVÉ!
+    private static final int MAX_TESTS = 6;
 
     private String name;
     private String surname;
     private String id;
     private int year, month, day;
 
-    // ✅ NOVÉ: Zoznam kódov PCR testov
     private ArrayList<Integer> pcrTestCodes;
     private int testCount;
 
@@ -29,7 +28,6 @@ public class Person implements IRecord<Person> {
         this.month = 0;
         this.day = 0;
 
-        // ✅ Inicializácia testov
         this.pcrTestCodes = new ArrayList<>(MAX_TESTS);
         for (int i = 0; i < MAX_TESTS; i++) {
             this.pcrTestCodes.add(0);
@@ -45,7 +43,6 @@ public class Person implements IRecord<Person> {
         this.month = m;
         this.day = d;
 
-        // ✅ Inicializácia testov
         this.pcrTestCodes = new ArrayList<>(MAX_TESTS);
         for (int i2 = 0; i2 < MAX_TESTS; i2++) {
             this.pcrTestCodes.add(0);
@@ -64,10 +61,9 @@ public class Person implements IRecord<Person> {
         return NAME_LEN + 1 + SURNAME_LEN + 1 + ID_LEN + 1 + 12 + 4 + (MAX_TESTS * 4);
     }
 
-    // ✅ NOVÉ METÓDY pre prácu s testami
     public boolean addTestCode(int testCode) {
         if (testCount >= MAX_TESTS) {
-            return false;  // Už má max testov
+            return false;
         }
         pcrTestCodes.set(testCount, testCode);
         testCount++;
@@ -77,12 +73,11 @@ public class Person implements IRecord<Person> {
     public boolean removeTestCode(int testCode) {
         for (int i = 0; i < testCount; i++) {
             if (pcrTestCodes.get(i) == testCode) {
-                // Shift left
                 for (int j = i + 1; j < testCount; j++) {
                     pcrTestCodes.set(j - 1, pcrTestCodes.get(j));
                 }
                 testCount--;
-                pcrTestCodes.set(testCount, 0);  // Vyčisti posledný
+                pcrTestCodes.set(testCount, 0);
                 return true;
             }
         }
@@ -101,7 +96,6 @@ public class Person implements IRecord<Person> {
         return testCount;
     }
 
-    // zapisanie
     @Override
     public ArrayList<Byte> getBytes() {
 
@@ -129,7 +123,7 @@ public class Person implements IRecord<Person> {
             dos.writeInt(this.month);
             dos.writeInt(this.day);
 
-            // ✅ NOVÉ: TEST CODES
+
             dos.writeInt(this.testCount);
             for (int i = 0; i < MAX_TESTS; i++) {
                 dos.writeInt(this.pcrTestCodes.get(i));
@@ -182,7 +176,6 @@ public class Person implements IRecord<Person> {
             this.month = dis.readInt();
             this.day = dis.readInt();
 
-            // ✅ NOVÉ: TEST CODES
             this.testCount = dis.readInt();
             if (this.pcrTestCodes == null) {
                 this.pcrTestCodes = new ArrayList<>(MAX_TESTS);
@@ -208,10 +201,6 @@ public class Person implements IRecord<Person> {
         return out;
     }
 
-    /*public void fromId(String newId) {
-        this.id = newId;
-    }*/
-
     public void fromId(String newId) {
         this.id = newId;
         this.name = "";
@@ -225,7 +214,6 @@ public class Person implements IRecord<Person> {
         return this.id;
     }
 
-    // ✅ NOVÉ gettery
     public String getName() {
         return name;
     }

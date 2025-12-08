@@ -18,9 +18,6 @@ public class MainPresenter {
         view.setPresenter(this);
     }
 
-    // ─────────────────────────────────────────
-    // TOP BUTTONS
-    // ─────────────────────────────────────────
 
     /*
     public void onGenerateData() {
@@ -64,9 +61,6 @@ public class MainPresenter {
         view.appendOutput("Súbory uložené. Program ukončený.");
     }
 
-    // ─────────────────────────────────────────
-    // TASK BUTTON DISPATCH
-    // ─────────────────────────────────────────
 
     public void onTaskSelected(int taskId) {
         switch (taskId) {
@@ -82,14 +76,8 @@ public class MainPresenter {
         }
     }
 
-    // ─────────────────────────────────────────
-    // 1. INSERT TEST
-    // ─────────────────────────────────────────
-
-    /*
     private void opInsertTest() {
         try {
-            // 1️⃣ Test Code
             String testCodeStr = view.promptInput("Zadaj ID testu (číslo):");
             if (testCodeStr == null || testCodeStr.isEmpty()) return;
 
@@ -97,195 +85,89 @@ public class MainPresenter {
             try {
                 testCode = Integer.parseInt(testCodeStr);
             } catch (NumberFormatException e) {
-                view.showMessage("❌ Test ID musí byť číslo.");
+                view.showMessage("Test ID musí byť číslo.");
                 return;
             }
 
-            // ✅ Skontroluj, či test s týmto ID už existuje
             if (model.findTest(testCode) != null) {
-                view.showMessage("❌ Test s týmto ID už existuje.");
+                view.showMessage("Test s týmto ID už existuje.");
                 return;
             }
 
-            // 2️⃣ ID osoby
             String pid = view.promptInput("Zadaj ID osoby (napr. P1):");
             if (pid == null || pid.isEmpty()) return;
 
             Person person = model.findPerson(pid);
             if (person == null) {
-                view.showMessage("❌ Osoba neexistuje.");
+                view.showMessage("Osoba neexistuje.");
                 return;
             }
 
-            // 3️⃣ Kontrola maxima testov
             if (person.getTestCount() >= 6) {
-                view.showMessage("❌ Osoba má už maximum testov (6).");
+                view.showMessage("Osoba má už maximum testov (6).");
                 return;
             }
 
-            // 4️⃣ Výsledok testu
-            String resultStr = view.promptInput("Výsledok (true=pozitívny, false=negatívny):");
-            if (resultStr == null || resultStr.isEmpty()) return;
-            boolean positive = Boolean.parseBoolean(resultStr);
-
-            // 5️⃣ Hodnota testu
-            String valueStr = view.promptInput("Hodnota (1-100):");
-            if (valueStr == null || valueStr.isEmpty()) return;
-            int value;
-            try {
-                value = Integer.parseInt(valueStr);
-                if (value < 1 || value > 100) {
-                    view.showMessage("❌ Hodnota musí byť medzi 1-100.");
-                    return;
-                }
-            } catch (NumberFormatException e) {
-                view.showMessage("❌ Hodnota musí byť číslo.");
-                return;
-            }
-
-            // 6️⃣ Poznámka
-            String note = view.promptInput("Poznámka (max 10 znakov):");
-            if (note == null) note = "";
-
-            // 7️⃣ Vytvor test
-            PCRTest test = new PCRTest(
-                    testCode,
-                    pid,
-                    System.currentTimeMillis(),
-                    positive,
-                    value,
-                    note
-            );
-
-            // 8️⃣ Vlož test do databázy
-            if (!model.insertTest(test)) {
-                view.showMessage("❌ Test sa nepodarilo vložiť do databázy.");
-                return;
-            }
-
-            // 9️⃣ KRITICKÉ: Pridaj testCode do Person + ulož
-            if (!model.addTestToPerson(pid, testCode)) {
-                view.showMessage("⚠️ Test vložený, ale nepodarilo sa aktualizovať osobu.");
-                return;
-            }
-
-            // 🔟 Úspech!
-            view.appendOutput("✅ Test úspešne vložený!\n");
-            view.appendOutput("   " + test + "\n");
-            view.appendOutput("   Osoba " + pid + " má teraz " + (person.getTestCount() + 1) + " testov.\n");
-
-        } catch (Exception e) {
-            view.showMessage("❌ Chyba: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }*/
-
-    private void opInsertTest() {
-        try {
-            // 1️⃣ Test Code
-            String testCodeStr = view.promptInput("Zadaj ID testu (číslo):");
-            if (testCodeStr == null || testCodeStr.isEmpty()) return;
-
-            int testCode;
-            try {
-                testCode = Integer.parseInt(testCodeStr);
-            } catch (NumberFormatException e) {
-                view.showMessage("❌ Test ID musí byť číslo.");
-                return;
-            }
-
-            // ✅ Skontroluj, či test s týmto ID už existuje
-            if (model.findTest(testCode) != null) {
-                view.showMessage("❌ Test s týmto ID už existuje.");
-                return;
-            }
-
-            // 2️⃣ ID osoby
-            String pid = view.promptInput("Zadaj ID osoby (napr. P1):");
-            if (pid == null || pid.isEmpty()) return;
-
-            Person person = model.findPerson(pid);
-            if (person == null) {
-                view.showMessage("❌ Osoba neexistuje.");
-                return;
-            }
-
-            // 3️⃣ Kontrola maxima testov
-            if (person.getTestCount() >= 6) {
-                view.showMessage("❌ Osoba má už maximum testov (6).");
-                return;
-            }
-
-            // 4️⃣ DÁTUM A ČAS - manuálne zadávanie
             int year = Integer.parseInt(view.promptInput("Rok (napr. 2024):"));
             int month = Integer.parseInt(view.promptInput("Mesiac (1-12):"));
             int day = Integer.parseInt(view.promptInput("Deň (1-31):"));
             int hour = Integer.parseInt(view.promptInput("Hodina (0-23):"));
             int minute = Integer.parseInt(view.promptInput("Minúta (0-59):"));
 
-            // 5️⃣ Výsledok testu
             String resultStr = view.promptInput("Výsledok (true=pozitívny, false=negatívny):");
             if (resultStr == null || resultStr.isEmpty()) return;
             boolean positive = Boolean.parseBoolean(resultStr);
 
-            // 6️⃣ Hodnota testu
             String valueStr = view.promptInput("Hodnota (1-100):");
             if (valueStr == null || valueStr.isEmpty()) return;
             double value;
             try {
                 value = Double.parseDouble(valueStr);
                 if (value < 1 || value > 100) {
-                    view.showMessage("❌ Hodnota musí byť medzi 1-100.");
+                    view.showMessage("Hodnota musí byť medzi 1-100.");
                     return;
                 }
             } catch (NumberFormatException e) {
-                view.showMessage("❌ Hodnota musí byť číslo.");
+                view.showMessage("Hodnota musí byť číslo.");
                 return;
             }
 
-            // 7️⃣ Poznámka
             String note = view.promptInput("Poznámka (max 10 znakov):");
             if (note == null) note = "";
 
-            // 8️⃣ Vytvor test - NOVÝ KONŠTRUKTOR s rozdelenými poliami
             PCRTest test = new PCRTest(
                     testCode,
                     pid,
-                    year, month, day, hour, minute,  // ✅ Manuálne zadané
+                    year, month, day, hour, minute,
                     positive,
                     value,
                     note
             );
 
-            // 9️⃣ Vlož test do databázy
             if (!model.insertTest(test)) {
-                view.showMessage("❌ Test sa nepodarilo vložiť do databázy.");
+                view.showMessage("Test sa nepodarilo vložiť do databázy.");
                 return;
             }
 
-            // 🔟 KRITICKÉ: Pridaj testCode do Person + ulož
             if (!model.addTestToPerson(pid, testCode)) {
-                view.showMessage("⚠️ Test vložený, ale nepodarilo sa aktualizovať osobu.");
+                view.showMessage("⚠Test vložený, ale nepodarilo sa aktualizovať osobu.");
                 return;
             }
 
-            // 1️⃣1️⃣ Úspech!
-            view.appendOutput("✅ Test úspešne vložený!\n");
+            view.appendOutput("Test úspešne vložený!\n");
             view.appendOutput("   " + test + "\n");
             view.appendOutput("   Osoba " + pid + " má teraz " + (person.getTestCount() + 1) + " testov.\n");
 
         } catch (NumberFormatException e) {
-            view.showMessage("❌ Chyba: Neplatné číslo!");
+            view.showMessage("Chyba: Neplatné číslo!");
         } catch (Exception e) {
-            view.showMessage("❌ Chyba: " + e.getMessage());
+            view.showMessage("Chyba: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    // ─────────────────────────────────────────
-    // 2. FIND PERSON
-    // ─────────────────────────────────────────
 
+/*
     private void opFindPerson() {
         String id = view.promptInput("Zadaj ID osoby:");
         if (id == null || id.isEmpty()) return;
@@ -297,11 +179,40 @@ public class MainPresenter {
         } else {
             view.appendOutput("Nájdená osoba: " + p);
         }
+    }*/
+
+    private void opFindPerson() {
+        try {
+            String id = view.promptInput("Zadaj ID osoby:");
+            if (id == null || id.isEmpty()) return;
+
+            Person p = model.findPerson(id);
+
+            if (p == null) {
+                view.showMessage("Osoba sa nenašla.");
+            } else {
+                view.appendOutput("═══════════════════════════════════");
+                view.appendOutput("Nájdená osoba: " + p);
+                view.appendOutput("═══════════════════════════════════");
+
+                if (p.getTestCount() == 0) {
+                    view.appendOutput("(žiadne testy)");
+                } else {
+                    view.appendOutput("TESTY:");
+                    for (int testCode : p.getTestCodes()) {
+                        PCRTest t = model.findTest(testCode);
+                        if (t != null) {
+                            view.appendOutput("- " + t);
+                        }
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            view.showMessage("Chyba: " + e.getMessage());
+        }
     }
 
-    // ─────────────────────────────────────────
-    // 3. FIND TEST
-    // ─────────────────────────────────────────
 
     private void opFindTest() {
         String codeStr = view.promptInput("Zadaj ID testu:");
@@ -321,9 +232,6 @@ public class MainPresenter {
             view.appendOutput("Nájdený test: " + t);
     }
 
-    // ─────────────────────────────────────────
-    // 4. INSERT PERSON
-    // ─────────────────────────────────────────
 
     private void opInsertPerson() {
         try {
@@ -353,9 +261,6 @@ public class MainPresenter {
         }
     }
 
-    // ─────────────────────────────────────────
-    // 5. DELETE TEST
-    // ─────────────────────────────────────────
 
     private void opDeleteTest() {
         String codeStr = view.promptInput("ID testu:");
@@ -369,9 +274,6 @@ public class MainPresenter {
             view.showMessage("Test sa nepodarilo vymazať.");
     }
 
-    // ─────────────────────────────────────────
-    // 6. DELETE PERSON
-    // ─────────────────────────────────────────
 
     private void opDeletePerson() {
         String id = view.promptInput("Zadaj ID osoby:");
@@ -383,9 +285,6 @@ public class MainPresenter {
             view.showMessage("Osobu sa nepodarilo vymazať.");
     }
 
-    // ─────────────────────────────────────────
-    // 7. EDIT PERSON
-    // ─────────────────────────────────────────
 
     private void opEditPerson() {
         String oldId = view.promptInput("ID osoby na editáciu:");
@@ -416,45 +315,9 @@ public class MainPresenter {
         }
     }
 
-    // ─────────────────────────────────────────
-    // 8. EDIT TEST
-    // ─────────────────────────────────────────
-
-    /*
-    private void opEditTest() {
-        String oldCodeStr = view.promptInput("ID testu na editáciu:");
-        if (oldCodeStr == null || oldCodeStr.isEmpty()) return;
-
-        int oldCode = Integer.parseInt(oldCodeStr);
-
-        PCRTest old = model.findTest(oldCode);
-        if (old == null) {
-            view.showMessage("Test neexistuje.");
-            return;
-        }
-
-        try {
-            String pid = view.promptInput("Nový patientID:");
-            boolean positive = Boolean.parseBoolean(view.promptInput("Pozitívny? true/false:"));
-            long time = Long.parseLong(view.promptInput("Nový timestamp:"));
-            int value = Integer.parseInt(view.promptInput("Nová hodnota:"));
-            String note = view.promptInput("Poznámka:");
-
-            PCRTest updated = new PCRTest(oldCode, pid, time, positive, value, note);
-
-            if (model.editTest(oldCode, updated))
-                view.appendOutput("Test zmenený: " + updated);
-            else
-                view.showMessage("Nepodarilo sa editovať test.");
-
-        } catch (Exception e) {
-            view.showMessage("Chyba: " + e.getMessage());
-        }
-    }*/
 
     private void opEditTest() {
         try {
-            // 1️⃣ ID testu na editáciu
             String oldCodeStr = view.promptInput("ID testu na editáciu:");
             if (oldCodeStr == null || oldCodeStr.isEmpty()) return;
 
@@ -466,55 +329,48 @@ public class MainPresenter {
                 return;
             }
 
-            // ⚠️ ZOBRAZ AKTUÁLNE HODNOTY
             view.appendOutput("Aktuálny test: " + old + "\n");
 
-            // 2️⃣ VÝSLEDOK (true/false)
             String resultStr = view.promptInput("Nový výsledok (true=pozitívny, false=negatívny):");
             if (resultStr == null || resultStr.isEmpty()) return;
             boolean positive = Boolean.parseBoolean(resultStr);
 
-            // 3️⃣ DÁTUM A ČAS - rozdelené polia
             int year = Integer.parseInt(view.promptInput("Rok (napr. 2024):"));
             int month = Integer.parseInt(view.promptInput("Mesiac (1-12):"));
             int day = Integer.parseInt(view.promptInput("Deň (1-31):"));
             int hour = Integer.parseInt(view.promptInput("Hodina (0-23):"));
             int minute = Integer.parseInt(view.promptInput("Minúta (0-59):"));
 
-            // 4️⃣ HODNOTA (1-100)
             String valueStr = view.promptInput("Nová hodnota (1-100):");
             if (valueStr == null || valueStr.isEmpty()) return;
             int value = Integer.parseInt(valueStr);
             if (value < 1 || value > 100) {
-                view.showMessage("❌ Hodnota musí byť medzi 1-100.");
+                view.showMessage("Hodnota musí byť medzi 1-100.");
                 return;
             }
 
-            // 5️⃣ POZNÁMKA
             String note = view.promptInput("Poznámka (max 10 znakov):");
             if (note == null) note = "";
 
-            // 6️⃣ VYTVOR NOVÝ TEST (s novým konštruktorom)
             PCRTest updated = new PCRTest(
                     oldCode,
-                    old.getPatientId(),  // ⚠️ PatientId sa NESMIE meniť!
+                    old.getPatientId(),
                     year, month, day, hour, minute,
                     positive,
                     value,
                     note
             );
 
-            // 7️⃣ ULOŽ
             if (model.editTest(oldCode, updated)) {
-                view.appendOutput("✅ Test zmenený: " + updated + "\n");
+                view.appendOutput("Test zmenený: " + updated + "\n");
             } else {
                 view.showMessage("Nepodarilo sa editovať test.");
             }
 
         } catch (NumberFormatException e) {
-            view.showMessage("❌ Chyba: Neplatné číslo!");
+            view.showMessage("Chyba: Neplatné číslo!");
         } catch (Exception e) {
-            view.showMessage("❌ Chyba: " + e.getMessage());
+            view.showMessage("Chyba: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -522,6 +378,8 @@ public class MainPresenter {
     public void onPrintPeople() {
         view.showOutput(model.printPeople());
     }
+
+
 
     public void onPrintTests() {
         view.showOutput(model.printTests());
@@ -531,7 +389,7 @@ public class MainPresenter {
     public void onRandomPrint() {
         Person p = model.getRandomPersonSimple();
         if (p == null) {
-            view.appendOutput("⚠️ V databáze nie sú žiadne osoby.\n");
+            view.appendOutput("V databáze nie sú žiadne osoby.\n");
             return;
         }
 
@@ -546,7 +404,6 @@ public class MainPresenter {
 
         sb.append("===== JEJ TESTY =====\n");
 
-        // ✅ Načítaj LEN testy tejto osoby
         ArrayList<PCRTest> tests = model.getPersonTests(p.getId());
 
         if (tests.isEmpty()) {

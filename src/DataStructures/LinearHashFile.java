@@ -475,9 +475,7 @@ public class LinearHashFile<T extends IRecord<T>> {
         long oldAddr   = (long) oldIndex * blockSize;
         long newAddr   = (long) newIndex * blockSize;
 
-        // ==========================================================
-        // 1) Načítanie
-        // ==========================================================
+
         ArrayList<T> allRecords = new ArrayList<>();
         Block<T> oldPrimary = mainFile.readBlock(oldAddr);
 
@@ -498,9 +496,6 @@ public class LinearHashFile<T extends IRecord<T>> {
             ovAddr = ovBlock.getNext();
         }
 
-        // ==========================================================
-        // 2) Vytvorenie nových primárnych blokov
-        // ==========================================================
         Block<T> newPrimOld = mainFile.createEmptyBlock();
         Block<T> newPrimNew = mainFile.createEmptyBlock();
 
@@ -510,9 +505,6 @@ public class LinearHashFile<T extends IRecord<T>> {
         int pBF = mainFile.getBlockFactor();
         int oBF = overflowFile.getBlockFactor();
 
-        // ==========================================================
-        // 3) Rozdelenie záznamov
-        // ==========================================================
         for (T rec : allRecords) {
             int idx = rec.getHashCode() % divisor;
             if (idx < 0) idx += divisor;
@@ -534,20 +526,17 @@ public class LinearHashFile<T extends IRecord<T>> {
             }
         }
 
-        // ==========================================================
-        // 4) Vytvorenie overflow blokov v OP
-        // ==========================================================
+
         ArrayList<Block<T>> oldOvBlocksInOP = new ArrayList<>();
-        ArrayList<Long>     oldOvAddrsToUse = new ArrayList<>();
+        ArrayList<Long> oldOvAddrsToUse = new ArrayList<>();
 
         ArrayList<Block<T>> newOvBlocksInOP = new ArrayList<>();
-        ArrayList<Long>     newOvAddrsToUse = new ArrayList<>();
+        ArrayList<Long> newOvAddrsToUse = new ArrayList<>();
 
         long overflowFileLen = overflowFile.getFileLength();
-        int addrIndex = 0;  // ← Tento je KĽÚČOVÝ!
+        int addrIndex = 0;
         int extraBlocks = 0;
 
-        // ------------ OLD overflow ------------
         int pos = 0;
         while (pos < overflowOld.size()) {
             Block<T> b = overflowFile.createEmptyBlock();
@@ -584,7 +573,6 @@ public class LinearHashFile<T extends IRecord<T>> {
             newPrimOld.setNext(-1);
         }
 
-        // ------------ NEW overflow ------------
         pos = 0;
         while (pos < overflowNew.size()) {
             Block<T> b = overflowFile.createEmptyBlock();
@@ -621,15 +609,11 @@ public class LinearHashFile<T extends IRecord<T>> {
             newPrimNew.setNext(-1);
         }
 
-        // ==========================================================
-        // 5) Zápis primárnych blokov
-        // ==========================================================
+
         mainFile.writeBlock(oldAddr, newPrimOld);
         mainFile.writeBlock(newAddr, newPrimNew);
 
-        // ==========================================================
-        // 6) Zápis overflow blokov
-        // ==========================================================
+
         for (int i = 0; i < oldOvBlocksInOP.size(); i++) {
             overflowFile.writeBlock(oldOvAddrsToUse.get(i), oldOvBlocksInOP.get(i));
         }
@@ -638,19 +622,15 @@ public class LinearHashFile<T extends IRecord<T>> {
             overflowFile.writeBlock(newOvAddrsToUse.get(i), newOvBlocksInOP.get(i));
         }
 
-        // ==========================================================
-        // 7) Vyprázdnenie nepoužitých overflow blokov
-        // ==========================================================
-        for (int i = addrIndex; i < oldOverflowAddrs.size(); i++) {  // ← addrIndex!
+
+        for (int i = addrIndex; i < oldOverflowAddrs.size(); i++) {
             Block<T> emptyBlock = overflowFile.createEmptyBlock();
             emptyBlock.setValidCount(0);
             emptyBlock.setNext(-1);
             overflowFile.writeBlock(oldOverflowAddrs.get(i), emptyBlock);
         }
 
-        // ==========================================================
-        // 8) Update S, u + cleanup
-        // ==========================================================
+
         S++;
         if (S >= base) {
             S = 0;
