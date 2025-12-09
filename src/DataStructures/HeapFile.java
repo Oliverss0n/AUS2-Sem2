@@ -17,14 +17,18 @@ public class HeapFile<T extends IRecord<T>> {
     private T prototype;
 
 
-    public HeapFile(String path, int blockSize, T prototype) throws Exception {
+
+    public HeapFile(String path, int blockSize, T prototype, boolean isOverflow) throws Exception {
         this.path = path;
-        this.metaPath = path + ".meta";
+        if (!isOverflow) {
+            this.metaPath = path + ".meta";
+        } else {
+            this.metaPath = null;
+        }
 
         this.blockSize = blockSize;
         this.prototype = prototype;
 
-        //this.blockFactor = (blockSize - 4) / prototype.getSize();
         this.blockFactor = (blockSize - 12) / prototype.getSize();
 
         this.freeBlocks = new ArrayList<>();
@@ -32,23 +36,13 @@ public class HeapFile<T extends IRecord<T>> {
 
         this.raf = new RandomAccessFile(path, "rw");
 
-        this.loadMetadata();
+        if (!isOverflow) {
+            this.loadMetadata();
+        }
 
     }
 
 
-    /*
-    private Block<T> emptyBlock() {
-        ArrayList<T> list = new ArrayList<>(blockFactor);
-        for (int i = 0; i < blockFactor; i++) {
-            try {
-                list.add((T) prototype.getClass().newInstance());
-            } catch (Exception e) {
-                throw new RuntimeException("Trieda musi mat prazdny konstruktor", e);
-            }
-        }
-        return new Block<>(blockFactor, prototype, list);
-    }*/
 
     private Block<T> emptyBlock() {
         ArrayList<T> list = new ArrayList<>(blockFactor);
@@ -187,59 +181,14 @@ public class HeapFile<T extends IRecord<T>> {
     }
 
 
-
-    /*
-        public Block<T> readBlock(long addr) throws Exception {
-            byte[] buf = new byte[this.blockSize];
-
-            raf.seek(addr);
-            raf.read(buf);
-
-            ArrayList<Byte> list = new ArrayList<>(this.blockSize);
-            for (byte prvok : buf) {
-                list.add(prvok);
-            }
-
-            Block<T> block = emptyBlock();
-            block.fromBytes(list);
-            return block;
-        }*/
-
-    /* --najaktualnejsie
-    public Block<T> readBlock(long addr) throws Exception {
-
-        raf.seek(addr);
-        byte[] raw = new byte[blockSize];
-        raf.read(raw);
-
-        DataInputStream dis = new DataInputStream(new ByteArrayInputStream(raw));
-
-        Block<T> block = emptyBlock();
-
-        block.setValidCount(dis.readInt());
-
-        block.setNext(dis.readLong());
-
-        for (int i = 0; i < blockFactor; i++) {
-            ArrayList<Byte> bytes = new ArrayList<>();
-            for (int j = 0; j < prototype.getSize(); j++) {
-                bytes.add(dis.readByte());
-            }
-            T rec = (T) prototype.getClass().newInstance();
-            rec.fromBytes(bytes);
-            block.getList().set(i, rec);
-        }
-
-        return block;
-    }*/
     public Block<T> readBlock(long addr) throws Exception {
         raf.seek(addr);
-        byte[] raw = new byte[blockSize];
-        raf.read(raw);
+        byte[] arr = new byte[blockSize];
+        raf.read(arr);
 
         ArrayList<Byte> byteList = new ArrayList<>(blockSize);
-        for (byte b : raw) {
-            byteList.add(b);
+        for (byte bajt : arr) {
+            byteList.add(bajt);
         }
 
         Block<T> block = emptyBlock();
@@ -248,53 +197,6 @@ public class HeapFile<T extends IRecord<T>> {
         return block;
     }
 
-
-    /*
-    public void writeBlock(long addr, Block<T> block) throws Exception {
-        ArrayList<Byte> arr = block.getBytes();
-
-        while (arr.size() < this.blockSize) {
-            arr.add((byte)0);
-        }
-
-        byte[] raw = new byte[this.blockSize];
-        for (int i = 0; i < this.blockSize; i++) {
-            raw[i] = arr.get(i);
-        }
-
-        raf.seek(addr);
-        raf.write(raw);
-    } */
-
-    /*--najaktualnejsie
-    public void writeBlock(long addr, Block<T> block) throws Exception {
-
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DataOutputStream dos = new DataOutputStream(baos);
-
-        dos.writeInt(block.getValidCount());
-
-        dos.writeLong(block.getNext());
-
-        for (int i = 0; i < blockFactor; i++) {
-            ArrayList<Byte> bytes = block.getList().get(i).getBytes();
-            for (byte b : bytes)
-                dos.writeByte(b);
-        }
-
-        byte[] tmp = baos.toByteArray();
-
-        byte[] finalBytes = new byte[blockSize];
-
-        int limit = Math.min(tmp.length, blockSize);
-        for (int i = 0; i < limit; i++) {
-            finalBytes[i] = tmp[i];
-        }
-
-
-        raf.seek(addr);
-        raf.write(finalBytes);
-    }*/
 
     public void writeBlock(long addr, Block<T> block) throws Exception {
         ArrayList<Byte> byteList = block.getBytes();
@@ -313,6 +215,7 @@ public class HeapFile<T extends IRecord<T>> {
 
 
     private void saveMetadata() throws Exception {
+        if (metaPath == null) return;
         PrintWriter pw = new PrintWriter(metaPath);
 
         pw.println(blockFactor);
@@ -332,13 +235,14 @@ public class HeapFile<T extends IRecord<T>> {
     }
 
     private void loadMetadata() throws Exception {
+        if (metaPath == null) return;
         File file = new File(metaPath);
         if (!file.exists()) return;
 
         Scanner sc = new Scanner(file);
 
         blockFactor = Integer.parseInt(sc.nextLine());
-        blockSize   = Integer.parseInt(sc.nextLine());
+        blockSize = Integer.parseInt(sc.nextLine());
 
         int free = Integer.parseInt(sc.nextLine());
         freeBlocks.clear();
@@ -435,41 +339,17 @@ public class HeapFile<T extends IRecord<T>> {
         raf.setLength(newSize);
     }
 
-    public void shrinkFileLH() throws Exception {
-        long fileLen = raf.length();
-        if (fileLen == 0) {
-            return;
-        }
 
-        long minSize = blockSize;
-
-        while (fileLen > minSize) {
-            long lastBlockAddr = fileLen - blockSize;
-            if (lastBlockAddr < 0) break;
-
-            Block<T> block = readBlock(lastBlockAddr);
-
-            if (block.getValidCount() == 0) {
-                fileLen -= blockSize;
-            } else {
-                break;
-            }
-        }
-
-        raf.setLength(Math.max(fileLen, minSize));
-
-        int i = 0;
-        while (i < freeBlocks.size()) {
-            if (freeBlocks.get(i) >= fileLen) {
-                freeBlocks.remove(i);
-            } else {
-                i++;
-            }
+    public void addToFreeList(long address) {
+        if (!freeBlocks.contains(address)) {
+            freeBlocks.add(address);
         }
     }
 
     public int getBlockFactor() {
         return blockFactor;
     }
+
+
 
 }

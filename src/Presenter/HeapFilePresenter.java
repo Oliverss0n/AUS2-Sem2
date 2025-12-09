@@ -16,10 +16,10 @@ public class HeapFilePresenter {
     private static final int GEN_COUNT = 100;
     private int idCounter = 0;
 
-    public HeapFilePresenter(HeapFileView view) throws Exception {
+    /*public HeapFilePresenter(HeapFileView view) throws Exception {
         this.view = view;
         this.heapFile = new HeapFile<>("data.bin", 256, new Person());
-    }
+    }*/
     public HeapFilePresenter(HeapFileView view, HeapFile<Person> shared) {
         this.view = view;
         this.heapFile = shared;

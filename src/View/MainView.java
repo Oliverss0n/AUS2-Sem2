@@ -15,6 +15,11 @@ public class MainView extends JFrame implements IMainView {
     private final JButton btnPrintPeople;
     private final JButton btnPrintTests;
 
+    private final JButton btnOpenDb;
+    private final JButton btnCreateDb;
+    private final JButton btnCloseDb;
+    private final JLabel lblDbStatus;
+
     private final JButton[] taskButtons;
     private MainPresenter presenter;
 
@@ -26,11 +31,27 @@ public class MainView extends JFrame implements IMainView {
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
 
+        JPanel dbPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        dbPanel.setBorder(BorderFactory.createTitledBorder("Database Management"));
+
+        btnOpenDb = new JButton("Open Database");
+        btnCreateDb = new JButton("Create New Database");
+        btnCloseDb = new JButton("Close Database");
+        lblDbStatus = new JLabel("No database open");
+        lblDbStatus.setFont(new Font("Arial", Font.BOLD, 12));
+        lblDbStatus.setForeground(Color.RED);
+
+        dbPanel.add(btnOpenDb);
+        dbPanel.add(btnCreateDb);
+        dbPanel.add(btnCloseDb);
+        dbPanel.add(Box.createHorizontalStrut(20));
+        dbPanel.add(lblDbStatus);
 
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        top.setBorder(BorderFactory.createTitledBorder("Operations"));
 
         btnGenerate = new JButton("Generovať dáta");
-        btnClose = new JButton("Close");
+        btnClose = new JButton("Close App");
         btnRandomPrint = new JButton("Náhodný výpis");
         btnPrintPeople = new JButton("Vypísať osoby");
         btnPrintTests = new JButton("Vypísať testy");
@@ -41,14 +62,16 @@ public class MainView extends JFrame implements IMainView {
         top.add(btnPrintPeople);
         top.add(btnPrintTests);
 
-        add(top, BorderLayout.NORTH);
+        JPanel northPanel = new JPanel(new BorderLayout());
+        northPanel.add(dbPanel, BorderLayout.NORTH);
+        northPanel.add(top, BorderLayout.SOUTH);
 
+        add(northPanel, BorderLayout.NORTH);
 
         outputArea = new JTextArea();
         outputArea.setFont(new Font("Consolas", Font.PLAIN, 13));
         outputArea.setEditable(false);
         add(new JScrollPane(outputArea), BorderLayout.CENTER);
-
 
         JPanel left = new JPanel(new GridLayout(0, 1, 5, 5));
 
@@ -78,9 +101,12 @@ public class MainView extends JFrame implements IMainView {
     public void setPresenter(MainPresenter presenter) {
         this.presenter = presenter;
 
+        btnOpenDb.addActionListener(e -> presenter.onOpenDatabase());
+        btnCreateDb.addActionListener(e -> presenter.onCreateDatabase());
+        btnCloseDb.addActionListener(e -> presenter.onCloseDatabase());
+
         btnGenerate.addActionListener(e -> presenter.onGenerateData());
         btnClose.addActionListener(e -> presenter.opClose());
-        btnRandomPrint.addActionListener(e -> presenter.onRandomPrint());
         btnPrintPeople.addActionListener(e -> presenter.onPrintPeople());
         btnPrintTests.addActionListener(e -> presenter.onPrintTests());
 
@@ -88,6 +114,24 @@ public class MainView extends JFrame implements IMainView {
             int id = i + 1;
             taskButtons[i].addActionListener(e -> presenter.onTaskSelected(id));
         }
+    }
+
+
+    public JButton getBtnOpenDb() {
+        return btnOpenDb;
+    }
+
+    public JButton getBtnCreateDb() {
+        return btnCreateDb;
+    }
+
+    public JButton getBtnCloseDb() {
+        return btnCloseDb;
+    }
+
+    public void setDbStatus(String status, boolean isOpen) {
+        lblDbStatus.setText(status);
+        lblDbStatus.setForeground(isOpen ? Color.GREEN.darker() : Color.RED);
     }
 
 
@@ -113,7 +157,6 @@ public class MainView extends JFrame implements IMainView {
                 JOptionPane.INFORMATION_MESSAGE
         );
     }
-
 
     @Override
     public void showOutput(String text) {

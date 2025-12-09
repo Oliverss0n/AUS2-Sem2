@@ -48,7 +48,7 @@ public class Main {
     }
 
 
-    private static void runHeapGUI() {
+    /*private static void runHeapGUI() {
 
         javax.swing.SwingUtilities.invokeLater(() -> {
             try {
@@ -70,7 +70,7 @@ public class Main {
                 e.printStackTrace();
             }
         });
-    }
+    }*/
 
     private static void runLinearHashGUI() {
 

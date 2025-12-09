@@ -12,11 +12,7 @@ public class PCRTest implements IRecord<PCRTest> {
     private int testCode;
     private String patientId;
 
-    private int year;
-    private int month;
-    private int day;
-    private int hour;
-    private int minute;
+    private long timestamp;
 
     private boolean result;
     private double value;
@@ -25,36 +21,41 @@ public class PCRTest implements IRecord<PCRTest> {
     public PCRTest() {
         this.testCode = 0;
         this.patientId = "";
-        this.year = 0;
-        this.month = 0;
-        this.day = 0;
-        this.hour = 0;
-        this.minute = 0;
+        this.timestamp = 0L;
         this.result = false;
         this.value = 0.0;
         this.note = "";
     }
 
-
-    public PCRTest(int testCode, String patientId, int year, int month, int day,
-                   int hour, int minute, boolean result, double value, String note) {
+    public PCRTest(int testCode, String patientId, long timestamp,
+                   boolean result, double value, String note) {
         this.testCode = testCode;
         this.patientId = patientId;
-        this.year = year;
-        this.month = month;
-        this.day = day;
-        this.hour = hour;
-        this.minute = minute;
+        this.timestamp = timestamp;
         this.result = result;
         this.value = value;
         this.note = note;
     }
 
+    public static long makeTimestamp(int year, int month, int day, int hour, int minute) {
+        //validacia pre rozsahy
+        if (year < 1000 || year > 9999) throw new IllegalArgumentException("Invalid year: " + year);
+        if (month < 1 || month > 12) throw new IllegalArgumentException("Invalid month: " + month);
+        if (day < 1 || day > 31) throw new IllegalArgumentException("Invalid day: " + day);
+        if (hour < 0 || hour > 23) throw new IllegalArgumentException("Invalid hour: " + hour);
+        if (minute < 0 || minute > 59) throw new IllegalArgumentException("Invalid minute: " + minute);
+
+        return (long) year * 100000000L +
+                (long) month * 1000000L +
+                (long) day * 10000L +
+                (long) hour * 100L +
+                (long) minute;
+    }
+
     @Override
     public int getSize() {
-        // testCode(4) + patientId(10+1) + datum(20) + result(1) + value(8) + note(11+1)
-        // datum: year(4) + month(4) + day(4) + hour(4) + minute(4) = 20
-        return 4 + (PATIENT_ID_LEN + 1) + 20 + 1 + 8 + (NOTE_LEN + 1);
+        // testCode(4) + patientId(10+1) + timestamp(8) + result(1) + value(8) + note(11+1)
+        return 4 + (PATIENT_ID_LEN + 1) + 8 + 1 + 8 + (NOTE_LEN + 1);
     }
 
     @Override
@@ -69,11 +70,7 @@ public class PCRTest implements IRecord<PCRTest> {
             dos.write(pad(idBytes, PATIENT_ID_LEN));
             dos.writeByte(Math.min(idBytes.length, PATIENT_ID_LEN));
 
-            dos.writeInt(this.year);
-            dos.writeInt(this.month);
-            dos.writeInt(this.day);
-            dos.writeInt(this.hour);
-            dos.writeInt(this.minute);
+            dos.writeLong(this.timestamp);
 
             dos.writeBoolean(this.result);
             dos.writeDouble(this.value);
@@ -110,11 +107,7 @@ public class PCRTest implements IRecord<PCRTest> {
             int idReal = dis.readUnsignedByte();
             this.patientId = new String(tmp, 0, idReal);
 
-            this.year = dis.readInt();
-            this.month = dis.readInt();
-            this.day = dis.readInt();
-            this.hour = dis.readInt();
-            this.minute = dis.readInt();
+            this.timestamp = dis.readLong();
 
             this.result = dis.readBoolean();
             this.value = dis.readDouble();
@@ -149,8 +142,9 @@ public class PCRTest implements IRecord<PCRTest> {
 
     @Override
     public PCRTest createEmpty() {
-        return new PCRTest(0, "", 0, 0, 0, 0, 0, false, 0.0, "");
+        return new PCRTest(0, "", 0L, false, 0.0, "");
     }
+
 
     public int getTestCode() { return testCode; }
     public void setTestCode(int testCode) { this.testCode = testCode; }
@@ -158,20 +152,33 @@ public class PCRTest implements IRecord<PCRTest> {
     public String getPatientId() { return patientId; }
     public void setPatientId(String patientId) { this.patientId = patientId; }
 
-    public int getYear() { return year; }
-    public void setYear(int year) { this.year = year; }
+    public int getYear() {
+        return (int) (timestamp / 100000000L);
+    }
 
-    public int getMonth() { return month; }
-    public void setMonth(int month) { this.month = month; }
+    public int getMonth() {
+        return (int) ((timestamp / 1000000L) % 100);
+    }
 
-    public int getDay() { return day; }
-    public void setDay(int day) { this.day = day; }
+    public int getDay() {
+        return (int) ((timestamp / 10000L) % 100);
+    }
 
-    public int getHour() { return hour; }
-    public void setHour(int hour) { this.hour = hour; }
+    public int getHour() {
+        return (int) ((timestamp / 100L) % 100);
+    }
 
-    public int getMinute() { return minute; }
-    public void setMinute(int minute) { this.minute = minute; }
+    public int getMinute() {
+        return (int) (timestamp % 100);
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public long getTimestamp() {
+        return timestamp;
+    }
 
     public boolean isResult() { return result; }
     public void setResult(boolean result) { this.result = result; }
@@ -186,8 +193,8 @@ public class PCRTest implements IRecord<PCRTest> {
     public String toString() {
         return "PCR Test #" + testCode +
                 " (Patient: " + patientId +
-                ", Date: " + year + "-" + String.format("%02d", month) + "-" + String.format("%02d", day) +
-                " " + String.format("%02d", hour) + ":" + String.format("%02d", minute) +
+                ", Date: " + getYear() + "-" + String.format("%02d", getMonth()) + "-" + String.format("%02d", getDay()) +
+                " " + String.format("%02d", getHour()) + ":" + String.format("%02d", getMinute()) +
                 ", Result: " + (result ? "Positive" : "Negative") +
                 ", Value: " + value + ")";
     }

@@ -5,23 +5,27 @@ import java.util.*;
 
 public class LinearHashFile<T extends IRecord<T>> {
 
+    private boolean useDensity = false;
+    private boolean useBucketSize = true;
+    private boolean useOverflowCount = false;
+
+    private double maxDensity = 1.3;
+    private int maxBucketSize = 8;
+    private int maxOverflowBlocks = 3;
+    private ArrayList<Integer> bucketRecordCount;
+    private ArrayList<Integer> bucketOverflowCount;
+
     private HeapFile<T> mainFile;
     private HeapFile<T> overflowFile;
     private int M;
     private int u;
     private int S;
-    private double d_max;
     private int totalRecords;
 
     private String metadataPath;
     private T prototype;
 
-    public LinearHashFile(String mainPath,
-                          int mainBlockSize,
-                          String overflowPath,
-                          int overflowBlockSize,
-                          int M,
-                          T prototype) throws Exception {
+    public LinearHashFile(String mainPath, int mainBlockSize, String overflowPath, int overflowBlockSize, int M, T prototype) throws Exception {
 
         this.prototype = prototype;
 
@@ -29,14 +33,20 @@ public class LinearHashFile<T extends IRecord<T>> {
         this.u = 0;
         this.S = 0;
 
-        this.d_max = 0.8;
-
         this.totalRecords = 0;
 
         this.metadataPath = mainPath + ".lh.meta";
+        bucketRecordCount = new ArrayList<>();
+        bucketOverflowCount = new ArrayList<>();
 
-        this.mainFile = new HeapFile<>(mainPath, mainBlockSize, prototype);
-        this.overflowFile = new HeapFile<>(overflowPath, overflowBlockSize, prototype);
+        for (int i = 0; i < M; i++) {
+            bucketRecordCount.add(0);
+            bucketOverflowCount.add(0);
+        }
+
+
+        this.mainFile = new HeapFile<>(mainPath, mainBlockSize, prototype, false);
+        this.overflowFile = new HeapFile<>(overflowPath, overflowBlockSize, prototype, true);
 
         loadMetadata();
         if (mainFile.getFileLength() == 0) {
@@ -61,7 +71,6 @@ public class LinearHashFile<T extends IRecord<T>> {
     }
 
 
-    /* s defaultnou kontroloou
     public void insert(T record) throws Exception {
         int key = record.getHashCode();
         int index = getIndex(key);
@@ -69,35 +78,7 @@ public class LinearHashFile<T extends IRecord<T>> {
         long offset = (long) index * mainFile.getBlockSize();
         Block<T> block = mainFile.readBlock(offset);
 
-        if (block.getValidCount() < mainFile.getBlockFactor()) {
-            block.getList().set(block.getValidCount(), record);
-            block.setValidCount(block.getValidCount() + 1);
-
-
-            mainFile.writeBlock(offset, block);
-
-            Block<T> verify = mainFile.readBlock(offset);
-            if (verify.getNext() == 0) {
-                throw new RuntimeException("PRIMARY BLOCK CORRUPTED at insert #" + (totalRecords + 1));
-            }
-
-            totalRecords++;
-
-            if (getDensity() > d_max) split();
-            return;
-        }
-
-
-        insertIntoOverflow(index, record);
-    }*/
-
-    public void insert(T record) throws Exception {
-        int key = record.getHashCode();
-        int index = getIndex(key);
-
-        long offset = (long) index * mainFile.getBlockSize();
-        Block<T> block = mainFile.readBlock(offset);
-
+        boolean newOverflowBlock = false;
 
         if (block.getValidCount() < mainFile.getBlockFactor()) {
 
@@ -105,42 +86,39 @@ public class LinearHashFile<T extends IRecord<T>> {
             block.setValidCount(block.getValidCount() + 1);
 
             mainFile.writeBlock(offset, block);
+
+
+            bucketRecordCount.set(index, bucketRecordCount.get(index) + 1);
 
             totalRecords++;
 
         } else {
 
-            insertIntoOverflow(index, record);
+            newOverflowBlock = insertIntoOverflow(index, record);
+
+
+            bucketRecordCount.set(index, bucketRecordCount.get(index) + 1);
+            if (newOverflowBlock) {
+                bucketOverflowCount.set(index,
+                        bucketOverflowCount.get(index) + 1);
+            }
+
             totalRecords++;
         }
 
-        Block<T> realBlock = mainFile.readBlock(offset);
-        int pBF = mainFile.getBlockFactor();
 
-        int primaryCount = realBlock.getValidCount();
-
-        int ovCount = 0;
-        long ovPtr = realBlock.getNext();
-        while (ovPtr != -1) {
-            Block<T> overflowBlock = overflowFile.readBlock(ovPtr);
-            ovCount += overflowBlock.getValidCount();
-            ovPtr = overflowBlock.getNext();
-        }
-
-        int bucketCount = primaryCount + ovCount;
-
-        if (bucketCount > 2 * pBF) {
+        if (shouldSplit(index)) {
             split();
         }
     }
 
 
-
-    private void insertIntoOverflow(int index, T record) throws Exception {
+    private boolean insertIntoOverflow(int index, T record) throws Exception {
 
         long primaryAddr = (long) index * mainFile.getBlockSize();
         Block<T> primary = mainFile.readBlock(primaryAddr);
         long nextAddr = primary.getNext();
+
 
         if (nextAddr == -1) {
             Block<T> newBlock = overflowFile.createEmptyBlock();
@@ -150,15 +128,10 @@ public class LinearHashFile<T extends IRecord<T>> {
 
             long newAddr = overflowFile.writeNewBlock(newBlock);
 
-            primary = mainFile.readBlock(primaryAddr);
             primary.setNext(newAddr);
-
             mainFile.writeBlock(primaryAddr, primary);
 
-            //totalRecords++;
-
-            //if (getDensity() > d_max) split();
-            return;
+            return true;
         }
 
         long currentAddr = nextAddr;
@@ -173,10 +146,7 @@ public class LinearHashFile<T extends IRecord<T>> {
 
                 overflowFile.writeBlock(currentAddr, current);
 
-                //totalRecords++;
-
-                //if (getDensity() > d_max) split();
-                return;
+                return false;
             }
 
             if (current.getNext() == -1) {
@@ -191,16 +161,14 @@ public class LinearHashFile<T extends IRecord<T>> {
                 current.setNext(newAddr);
                 overflowFile.writeBlock(currentAddr, current);
 
-                //totalRecords++;
-
-               // if (getDensity() > d_max) split();
-                return;
+                return true;
             }
 
             currentAddr = current.getNext();
             current = overflowFile.readBlock(currentAddr);
         }
     }
+
 
 
     public T find(T data) throws Exception {
@@ -308,7 +276,7 @@ public class LinearHashFile<T extends IRecord<T>> {
         return i;
     }
 
-    //este pre defaultnu podmienku
+
     private double getDensity() {
 
         int currentGroups = this.S + this.M * (int) Math.pow(2, u);
@@ -323,322 +291,168 @@ public class LinearHashFile<T extends IRecord<T>> {
     }
 
 
-    /*
     private void split() throws Exception {
 
-        int oldIndex = S;
-        int base     = M * (int) Math.pow(2, u);
-        int newIndex = oldIndex + base;
-        int divisor  = M * (int) Math.pow(2, u + 1);
+        int splitBucketIndex = S;
+        int currentLevelSize = M * (int) Math.pow(2, u);
+        int newBucketIndex = splitBucketIndex + currentLevelSize;
+        int newDivisor = M * (int) Math.pow(2, u + 1);
 
         long blockSize = mainFile.getBlockSize();
-        long oldAddr   = (long) oldIndex * blockSize;
-        long newAddr   = (long) newIndex * blockSize;
+        long oldBucketAddress = (long) splitBucketIndex * blockSize;
+        long newBucketAddress = (long) newBucketIndex * blockSize;
 
-        ArrayList<T> allRecords = new ArrayList<>();
-        Block<T> oldPrim = mainFile.readBlock(oldAddr);
-
-        //nazbieranie starych zaznamov
-        for (int i = 0; i < oldPrim.getValidCount(); i++) {
-            allRecords.add(oldPrim.getList().get(i));
+        while (bucketRecordCount.size() <= newBucketIndex) {
+            bucketRecordCount.add(0);
+            bucketOverflowCount.add(0);
         }
 
-        long ovFlowAddr = oldPrim.getNext();
-        while (ovFlowAddr != -1) {
-            Block<T> overflowBlock = overflowFile.readBlock(ovFlowAddr);
+        ArrayList<T> allRecordsFromBucket = new ArrayList<>();
+        Block<T> oldPrimaryBlock = mainFile.readBlock(oldBucketAddress);
+
+        for (int i = 0; i < oldPrimaryBlock.getValidCount(); i++) {
+            allRecordsFromBucket.add(oldPrimaryBlock.getList().get(i));
+        }
+
+        ArrayList<Long> originalOverflowAddresses = new ArrayList<>();
+        long currentOverflowAddress = oldPrimaryBlock.getNext();
+
+        while (currentOverflowAddress != -1) {
+            originalOverflowAddresses.add(currentOverflowAddress);
+            Block<T> overflowBlock = overflowFile.readBlock(currentOverflowAddress);
+
             for (int i = 0; i < overflowBlock.getValidCount(); i++) {
-                allRecords.add(overflowBlock.getList().get(i));
+                allRecordsFromBucket.add(overflowBlock.getList().get(i));
             }
-            ovFlowAddr = overflowBlock.getNext();
+            currentOverflowAddress = overflowBlock.getNext();
         }
 
-        //vytvorenie novych blockov
-        Block<T> primaryOld = mainFile.createEmptyBlock();
-        Block<T> primaryNew = mainFile.createEmptyBlock();
-        primaryOld.setNext(-1);
-        primaryNew.setNext(-1);
+        Block<T> newPrimaryForOldBucket = mainFile.createEmptyBlock();
+        Block<T> newPrimaryForNewBucket = mainFile.createEmptyBlock();
 
-        ArrayList<T> ovFlowOld = new ArrayList<>();
-        ArrayList<T> ovFlowNew = new ArrayList<>();
+        ArrayList<T> overflowRecordsForOldBucket = new ArrayList<>();
+        ArrayList<T> overflowRecordsForNewBucket = new ArrayList<>();
 
-        int pBF = mainFile.getBlockFactor();
-        int oBF = overflowFile.getBlockFactor();
+        int primaryBlockFactor = mainFile.getBlockFactor();
+        int overflowBlockFactor = overflowFile.getBlockFactor();
 
-        //roztriedenie zaznamov medzi stary a novy
-        for (T record : allRecords) {
-            int hashIndex = record.getHashCode() % divisor;
-            if (hashIndex < 0) {
-                hashIndex += divisor;
-            }
+        for (T record : allRecordsFromBucket) {
+            int targetBucketIndex = record.getHashCode() % newDivisor;
+            if (targetBucketIndex < 0) targetBucketIndex += newDivisor;
 
-            if (hashIndex == oldIndex) {
-                if (primaryOld.getValidCount() < pBF) {
-                    primaryOld.getList().set(primaryOld.getValidCount(), record);
-                    primaryOld.setValidCount(primaryOld.getValidCount() + 1);
+            if (targetBucketIndex == splitBucketIndex) {
+                if (newPrimaryForOldBucket.getValidCount() < primaryBlockFactor) {
+                    newPrimaryForOldBucket.getList().set(newPrimaryForOldBucket.getValidCount(), record);
+                    newPrimaryForOldBucket.setValidCount(newPrimaryForOldBucket.getValidCount() + 1);
                 } else {
-                    ovFlowOld.add(record);
+                    overflowRecordsForOldBucket.add(record);
                 }
             } else {
-                if (primaryNew.getValidCount() < pBF) {
-                    primaryNew.getList().set(primaryNew.getValidCount(), record);
-                    primaryNew.setValidCount(primaryNew.getValidCount() + 1);
+                if (newPrimaryForNewBucket.getValidCount() < primaryBlockFactor) {
+                    newPrimaryForNewBucket.getList().set(newPrimaryForNewBucket.getValidCount(), record);
+                    newPrimaryForNewBucket.setValidCount(newPrimaryForNewBucket.getValidCount() + 1);
                 } else {
-                    ovFlowNew.add(record);
+                    overflowRecordsForNewBucket.add(record);
                 }
             }
         }
 
-        long firstBlockAddr = -1;
-        long previousBlockAddr = -1;
-        int recordPosition = 0; //alebo index v arrayliste
+        bucketRecordCount.set(splitBucketIndex, newPrimaryForOldBucket.getValidCount() + overflowRecordsForOldBucket.size());
+        bucketRecordCount.set(newBucketIndex, newPrimaryForNewBucket.getValidCount() + overflowRecordsForNewBucket.size());
 
-        //overflow pre povodny block
-        while (recordPosition < ovFlowOld.size()) {
-            Block<T> ovFlowBlock = overflowFile.createEmptyBlock();
-            int recordCount = 0;
+        bucketOverflowCount.set(splitBucketIndex, (overflowRecordsForOldBucket.size() + overflowBlockFactor - 1) / overflowBlockFactor);
+        bucketOverflowCount.set(newBucketIndex, (overflowRecordsForNewBucket.size() + overflowBlockFactor - 1) / overflowBlockFactor);
 
-            while (recordCount < oBF && recordPosition < ovFlowOld.size()) {
-                ovFlowBlock.getList().set(recordCount, ovFlowOld.get(recordPosition));
-                recordCount++;
-                recordPosition++;
+        ArrayList<Block<T>> oldBucketOverflowBlocks = new ArrayList<>();
+        ArrayList<Long> oldBucketOverflowAddresses = new ArrayList<>();
+
+        ArrayList<Block<T>> newBucketOverflowBlocks = new ArrayList<>();
+        ArrayList<Long> newBucketOverflowAddresses = new ArrayList<>();
+
+        long overflowFileLength = overflowFile.getFileLength();
+        int addressReuseIndex = 0;
+        int additionalBlocksNeeded = 0;
+
+        int recordPosition = 0;
+        while (recordPosition < overflowRecordsForOldBucket.size()) {
+            Block<T> overflowBlock = overflowFile.createEmptyBlock();
+            int recordsInBlock = 0;
+
+            while (recordsInBlock < overflowBlockFactor && recordPosition < overflowRecordsForOldBucket.size()) {
+                overflowBlock.getList().set(recordsInBlock++, overflowRecordsForOldBucket.get(recordPosition++));
             }
 
-            ovFlowBlock.setValidCount(recordCount);
-            ovFlowBlock.setNext(-1);
+            overflowBlock.setValidCount(recordsInBlock);
+            overflowBlock.setNext(-1);
 
-            long addr = overflowFile.writeNewBlock(ovFlowBlock);
+            long blockAddress = (addressReuseIndex < originalOverflowAddresses.size())
+                    ? originalOverflowAddresses.get(addressReuseIndex++)
+                    : overflowFileLength + (long) (additionalBlocksNeeded++) * blockSize;
 
-            if (firstBlockAddr == -1) {
-                firstBlockAddr = addr;
-            }
-            else {
-                Block<T> previousBlock = overflowFile.readBlock(previousBlockAddr);
-                previousBlock.setNext(addr);
-                overflowFile.writeBlock(previousBlockAddr, previousBlock);
-            }
-            previousBlockAddr = addr;
+            oldBucketOverflowBlocks.add(overflowBlock);
+            oldBucketOverflowAddresses.add(blockAddress);
         }
-        primaryOld.setNext(firstBlockAddr);
 
-        long firstNew = -1;
-        previousBlockAddr = -1;
+        for (int i = 0; i < oldBucketOverflowBlocks.size() - 1; i++) {
+            oldBucketOverflowBlocks.get(i).setNext(oldBucketOverflowAddresses.get(i + 1));
+        }
+        newPrimaryForOldBucket.setNext(oldBucketOverflowAddresses.isEmpty() ? -1 : oldBucketOverflowAddresses.get(0));
+
         recordPosition = 0;
+        while (recordPosition < overflowRecordsForNewBucket.size()) {
+            Block<T> overflowBlock = overflowFile.createEmptyBlock();
+            int recordsInBlock = 0;
 
-        ////overflow pre novy block
-        while (recordPosition < ovFlowNew.size()) {
-            Block<T> ovFlowBlock = overflowFile.createEmptyBlock();
-            int recordCount = 0;
-
-            while (recordCount < oBF && recordPosition < ovFlowNew.size()) {
-                ovFlowBlock.getList().set(recordCount, ovFlowNew.get(recordPosition));
-                recordCount++;
-                recordPosition++;
+            while (recordsInBlock < overflowBlockFactor && recordPosition < overflowRecordsForNewBucket.size()) {
+                overflowBlock.getList().set(recordsInBlock++, overflowRecordsForNewBucket.get(recordPosition++));
             }
 
-            ovFlowBlock.setValidCount(recordCount);
-            ovFlowBlock.setNext(-1);
+            overflowBlock.setValidCount(recordsInBlock);
+            overflowBlock.setNext(-1);
 
-            long addr = overflowFile.writeNewBlock(ovFlowBlock);
+            long blockAddress = (addressReuseIndex < originalOverflowAddresses.size())
+                    ? originalOverflowAddresses.get(addressReuseIndex++)
+                    : overflowFileLength + (long) (additionalBlocksNeeded++) * blockSize;
 
-            if (firstNew == -1) {
-                firstNew = addr;
-            }
-            else {
-                Block<T> previousBlock = overflowFile.readBlock(previousBlockAddr);
-                previousBlock.setNext(addr);
-                overflowFile.writeBlock(previousBlockAddr, previousBlock);
-            }
-            previousBlockAddr = addr;
-        }
-        primaryNew.setNext(firstNew);
-
-        mainFile.writeBlock(oldAddr, primaryOld);
-        mainFile.writeBlock(newAddr, primaryNew);
-
-        S++;
-        if (S >= base) {
-            S = 0;
-            u++;
+            newBucketOverflowBlocks.add(overflowBlock);
+            newBucketOverflowAddresses.add(blockAddress);
         }
 
-        overflowFile.shrinkFileLH();
-    }*/
+        for (int i = 0; i < newBucketOverflowBlocks.size() - 1; i++) {
+            newBucketOverflowBlocks.get(i).setNext(newBucketOverflowAddresses.get(i + 1));
+        }
+        newPrimaryForNewBucket.setNext(newBucketOverflowAddresses.isEmpty() ? -1 : newBucketOverflowAddresses.get(0));
 
-    private void split() throws Exception {
+        mainFile.writeBlock(oldBucketAddress, newPrimaryForOldBucket);
+        mainFile.writeBlock(newBucketAddress, newPrimaryForNewBucket);
 
-        int oldIndex = S;
-        int base     = M * (int) Math.pow(2, u);
-        int newIndex = oldIndex + base;
-        int divisor  = M * (int) Math.pow(2, u + 1);
-
-        long blockSize = mainFile.getBlockSize();
-        long oldAddr   = (long) oldIndex * blockSize;
-        long newAddr   = (long) newIndex * blockSize;
-
-
-        ArrayList<T> allRecords = new ArrayList<>();
-        Block<T> oldPrimary = mainFile.readBlock(oldAddr);
-
-        for (int i = 0; i < oldPrimary.getValidCount(); i++) {
-            allRecords.add(oldPrimary.getList().get(i));
+        for (int i = 0; i < oldBucketOverflowBlocks.size(); i++) {
+            overflowFile.writeBlock(oldBucketOverflowAddresses.get(i), oldBucketOverflowBlocks.get(i));
+        }
+        for (int i = 0; i < newBucketOverflowBlocks.size(); i++) {
+            overflowFile.writeBlock(newBucketOverflowAddresses.get(i), newBucketOverflowBlocks.get(i));
         }
 
-        ArrayList<Long> oldOverflowAddrs = new ArrayList<>();
-        long ovAddr = oldPrimary.getNext();
+        for (int i = addressReuseIndex; i < originalOverflowAddresses.size(); i++) {
+            long address = originalOverflowAddresses.get(i);
 
-        while (ovAddr != -1) {
-            oldOverflowAddrs.add(ovAddr);
-            Block<T> ovBlock = overflowFile.readBlock(ovAddr);
-
-            for (int i = 0; i < ovBlock.getValidCount(); i++) {
-                allRecords.add(ovBlock.getList().get(i));
-            }
-            ovAddr = ovBlock.getNext();
-        }
-
-        Block<T> newPrimOld = mainFile.createEmptyBlock();
-        Block<T> newPrimNew = mainFile.createEmptyBlock();
-
-        ArrayList<T> overflowOld = new ArrayList<>();
-        ArrayList<T> overflowNew = new ArrayList<>();
-
-        int pBF = mainFile.getBlockFactor();
-        int oBF = overflowFile.getBlockFactor();
-
-        for (T rec : allRecords) {
-            int idx = rec.getHashCode() % divisor;
-            if (idx < 0) idx += divisor;
-
-            if (idx == oldIndex) {
-                if (newPrimOld.getValidCount() < pBF) {
-                    newPrimOld.getList().set(newPrimOld.getValidCount(), rec);
-                    newPrimOld.setValidCount(newPrimOld.getValidCount() + 1);
-                } else {
-                    overflowOld.add(rec);
-                }
-            } else {
-                if (newPrimNew.getValidCount() < pBF) {
-                    newPrimNew.getList().set(newPrimNew.getValidCount(), rec);
-                    newPrimNew.setValidCount(newPrimNew.getValidCount() + 1);
-                } else {
-                    overflowNew.add(rec);
-                }
-            }
-        }
-
-
-        ArrayList<Block<T>> oldOvBlocksInOP = new ArrayList<>();
-        ArrayList<Long> oldOvAddrsToUse = new ArrayList<>();
-
-        ArrayList<Block<T>> newOvBlocksInOP = new ArrayList<>();
-        ArrayList<Long> newOvAddrsToUse = new ArrayList<>();
-
-        long overflowFileLen = overflowFile.getFileLength();
-        int addrIndex = 0;
-        int extraBlocks = 0;
-
-        int pos = 0;
-        while (pos < overflowOld.size()) {
-            Block<T> b = overflowFile.createEmptyBlock();
-            int count = 0;
-
-            while (count < oBF && pos < overflowOld.size()) {
-                b.getList().set(count, overflowOld.get(pos));
-                count++;
-                pos++;
-            }
-
-            b.setValidCount(count);
-            b.setNext(-1);
-
-            long addr;
-            if (addrIndex < oldOverflowAddrs.size()) {
-                addr = oldOverflowAddrs.get(addrIndex++);
-            } else {
-                addr = overflowFileLen + (long) extraBlocks * blockSize;
-                extraBlocks++;
-            }
-
-            oldOvBlocksInOP.add(b);
-            oldOvAddrsToUse.add(addr);
-        }
-
-        for (int i = 0; i < oldOvBlocksInOP.size() - 1; i++) {
-            oldOvBlocksInOP.get(i).setNext(oldOvAddrsToUse.get(i + 1));
-        }
-
-        if (!oldOvAddrsToUse.isEmpty()) {
-            newPrimOld.setNext(oldOvAddrsToUse.get(0));
-        } else {
-            newPrimOld.setNext(-1);
-        }
-
-        pos = 0;
-        while (pos < overflowNew.size()) {
-            Block<T> b = overflowFile.createEmptyBlock();
-            int count = 0;
-
-            while (count < oBF && pos < overflowNew.size()) {
-                b.getList().set(count, overflowNew.get(pos));
-                count++;
-                pos++;
-            }
-
-            b.setValidCount(count);
-            b.setNext(-1);
-
-            long addr;
-            if (addrIndex < oldOverflowAddrs.size()) {
-                addr = oldOverflowAddrs.get(addrIndex++);
-            } else {
-                addr = overflowFileLen + (long) extraBlocks * blockSize;
-                extraBlocks++;
-            }
-
-            newOvBlocksInOP.add(b);
-            newOvAddrsToUse.add(addr);
-        }
-
-        for (int i = 0; i < newOvBlocksInOP.size() - 1; i++) {
-            newOvBlocksInOP.get(i).setNext(newOvAddrsToUse.get(i + 1));
-        }
-
-        if (!newOvAddrsToUse.isEmpty()) {
-            newPrimNew.setNext(newOvAddrsToUse.get(0));
-        } else {
-            newPrimNew.setNext(-1);
-        }
-
-
-        mainFile.writeBlock(oldAddr, newPrimOld);
-        mainFile.writeBlock(newAddr, newPrimNew);
-
-
-        for (int i = 0; i < oldOvBlocksInOP.size(); i++) {
-            overflowFile.writeBlock(oldOvAddrsToUse.get(i), oldOvBlocksInOP.get(i));
-        }
-
-        for (int i = 0; i < newOvBlocksInOP.size(); i++) {
-            overflowFile.writeBlock(newOvAddrsToUse.get(i), newOvBlocksInOP.get(i));
-        }
-
-
-        for (int i = addrIndex; i < oldOverflowAddrs.size(); i++) {
             Block<T> emptyBlock = overflowFile.createEmptyBlock();
             emptyBlock.setValidCount(0);
             emptyBlock.setNext(-1);
-            overflowFile.writeBlock(oldOverflowAddrs.get(i), emptyBlock);
+            overflowFile.writeBlock(address, emptyBlock);
+
+            overflowFile.addToFreeList(address);
         }
 
-
         S++;
-        if (S >= base) {
+        if (S >= currentLevelSize) {
             S = 0;
             u++;
         }
 
-        overflowFile.shrinkFileLH();
+        overflowFile.shrinkFile();
     }
+
 
 
     public int getM() {
@@ -663,6 +477,7 @@ public class LinearHashFile<T extends IRecord<T>> {
 
 
 
+    /*
     private void saveMetadata() throws Exception {
 
         PrintWriter pw = new PrintWriter(metadataPath);
@@ -675,11 +490,31 @@ public class LinearHashFile<T extends IRecord<T>> {
 
 
         pw.close();
+    }*/
+
+    private void saveMetadata() throws Exception {
+        PrintWriter pw = new PrintWriter(metadataPath);
+
+        pw.println(M);
+        pw.println(u);
+        pw.println(S);
+        pw.println(maxDensity);
+        pw.println(totalRecords);
+
+        pw.println(bucketRecordCount.size());
+        for (int count : bucketRecordCount) {
+            pw.println(count);
+        }
+
+        pw.println(bucketOverflowCount.size());
+        for (int count : bucketOverflowCount) {
+            pw.println(count);
+        }
+
+        pw.close();
     }
 
-
     private void loadMetadata() throws Exception {
-
         File f = new File(metadataPath);
         if (!f.exists()) return;
 
@@ -688,9 +523,20 @@ public class LinearHashFile<T extends IRecord<T>> {
         M = Integer.parseInt(sc.nextLine());
         u = Integer.parseInt(sc.nextLine());
         S = Integer.parseInt(sc.nextLine());
-        d_max = Double.parseDouble(sc.nextLine());
+        maxDensity = Double.parseDouble(sc.nextLine());
         totalRecords = Integer.parseInt(sc.nextLine());
 
+        int recordCountSize = Integer.parseInt(sc.nextLine());
+        bucketRecordCount = new ArrayList<>();
+        for (int i = 0; i < recordCountSize; i++) {
+            bucketRecordCount.add(Integer.parseInt(sc.nextLine()));
+        }
+
+        int overflowCountSize = Integer.parseInt(sc.nextLine());
+        bucketOverflowCount = new ArrayList<>();
+        for (int i = 0; i < overflowCountSize; i++) {
+            bucketOverflowCount.add(Integer.parseInt(sc.nextLine()));
+        }
 
         sc.close();
     }
@@ -770,6 +616,46 @@ public class LinearHashFile<T extends IRecord<T>> {
 
         return sb.toString();
     }
+
+    public void enableDensitySplit(double maxDensity) {
+        this.useDensity = true;
+        this.maxDensity = maxDensity;
+    }
+
+    public void enableBucketSizeSplit(int maxSize) {
+        this.useBucketSize = true;
+        this.maxBucketSize = maxSize;
+    }
+
+    public void enableOverflowCountSplit(int maxCount) {
+        this.useOverflowCount = true;
+        this.maxOverflowBlocks = maxCount;
+    }
+
+    private boolean shouldSplit(int index) {
+
+        if (useDensity) {
+            if (getDensity() > maxDensity) {
+                return true;
+            }
+        }
+
+        if (useBucketSize) {
+            if (bucketRecordCount.get(index) > maxBucketSize) {
+                return true;
+            }
+        }
+
+        if (useOverflowCount) {
+            if (bucketOverflowCount.get(index) > maxOverflowBlocks) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
 
 
 
