@@ -23,10 +23,10 @@ public class MainPresenter {
 
     public void onOpenDatabase() {
         try {
-            String peoplePath = view.promptInput("Zadaj cestu k people súborom (bez prípony, napr. 'db1/people'):");
+            String peoplePath = view.promptInput("Zadaj cestu k people súborom napr. 'people':");
             if (peoplePath == null || peoplePath.isEmpty()) return;
 
-            String testsPath = view.promptInput("Zadaj cestu k tests súborom (bez prípony, napr. 'db1/tests'):");
+            String testsPath = view.promptInput("Zadaj cestu k tests súborom napr. 'tests':");
             if (testsPath == null || testsPath.isEmpty()) return;
 
             model.openDatabase(peoplePath, testsPath);
@@ -43,56 +43,51 @@ public class MainPresenter {
             e.printStackTrace();
         }
     }
-
     public void onCreateDatabase() {
         try {
-            String peoplePath = view.promptInput("Zadaj cestu k people súborom (bez prípony, napr. 'db1/people'):");
+            String peoplePath = view.promptInput(
+                    "People path napr. 'people'):");
             if (peoplePath == null || peoplePath.isEmpty()) return;
 
-            String testsPath = view.promptInput("Zadaj cestu k tests súborom (bez prípony, napr. 'db1/tests'):");
+            String testsPath = view.promptInput(
+                    "Tests path napr. 'tests':");
             if (testsPath == null || testsPath.isEmpty()) return;
 
-            String blockSizeStr = view.promptInput("Zadaj veľkosť bloku (default 256):");
-            int blockSize = 256;
-            if (blockSizeStr != null && !blockSizeStr.isEmpty()) {
-                try {
-                    blockSize = Integer.parseInt(blockSizeStr);
-                    if (blockSize < 64 || blockSize > 4096) {
-                        view.showMessage("Veľkosť bloku musí byť medzi 64-4096. Použije sa default 256.");
-                        blockSize = 256;
-                    }
-                } catch (NumberFormatException e) {
-                    view.showMessage("Neplatné číslo. Použije sa default 256.");
-                }
-            }
+            int peopleMainBlock = readInt(
+                    "People MAIN block size (default 256):", 256);
+            int peopleOverflowBlock = readInt(
+                    "People OVERFLOW block size (default 256):", 256);
 
-            String mStr = view.promptInput("Zadaj počiatočný M (počet primárnych blokov, default 4):");
-            int m = 4;
-            if (mStr != null && !mStr.isEmpty()) {
-                try {
-                    m = Integer.parseInt(mStr);
-                    if (m < 2 || m > 16) {
-                        view.showMessage("M musí byť medzi 2-16. Použije sa default 4.");
-                        m = 4;
-                    }
-                } catch (NumberFormatException e) {
-                    view.showMessage("Neplatné číslo. Použije sa default 4.");
-                }
-            }
+            int testsMainBlock = readInt(
+                    "Tests MAIN block size (default 256):", 256);
+            int testsOverflowBlock = readInt(
+                    "Tests OVERFLOW block size (default 256):", 256);
 
-            model.createDatabase(peoplePath, testsPath, blockSize, blockSize, m);
+            int peopleM = readInt(
+                    "People počiatočné M (default 4):", 4);
+            int testsM = readInt(
+                    "Tests počiatočné M (default 4):", 4);
 
-            view.showMessage("Databáza úspešne vytvorená!\n" +
-                    "People: " + peoplePath + "\n" +
-                    "Tests: " + testsPath + "\n" +
-                    "Block size: " + blockSize + "\n" +
-                    "M: " + m);
+            model.createDatabase(
+                    peoplePath,
+                    testsPath,
+                    peopleMainBlock,
+                    peopleOverflowBlock,
+                    testsMainBlock,
+                    testsOverflowBlock,
+                    peopleM,
+                    testsM
+            );
 
             view.appendOutput("=== NEW DATABASE CREATED ===\n");
-            view.appendOutput("People path: " + peoplePath + "\n");
-            view.appendOutput("Tests path: " + testsPath + "\n");
-            view.appendOutput("Block size: " + blockSize + "\n");
-            view.appendOutput("Initial M: " + m + "\n");
+            view.appendOutput("People: " + peoplePath + "\n");
+            view.appendOutput("  main block = " + peopleMainBlock + "\n");
+            view.appendOutput("  overflow block = " + peopleOverflowBlock + "\n");
+            view.appendOutput("  M = " + peopleM + "\n");
+            view.appendOutput("Tests: " + testsPath + "\n");
+            view.appendOutput("  main block = " + testsMainBlock + "\n");
+            view.appendOutput("  overflow block = " + testsOverflowBlock + "\n");
+            view.appendOutput("  M = " + testsM + "\n");
 
             updateDbStatus();
 
@@ -101,6 +96,20 @@ public class MainPresenter {
             e.printStackTrace();
         }
     }
+
+    private int readInt(String prompt, int def) {
+        String s = view.promptInput(prompt);
+        if (s == null || s.isEmpty()) return def;
+        try {
+            int v = Integer.parseInt(s);
+            if (v < 64 || v > 4096) return def;
+            return v;
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
+
 
     public void onCloseDatabase() {
         try {
@@ -125,9 +134,9 @@ public class MainPresenter {
 
     private void updateDbStatus() {
         if (model.isDbOpen()) {
-            view.setDbStatus("Database OPEN", true);
+            view.setDbStatus("Súbor otvorený", true);
         } else {
-            view.setDbStatus("No database open", false);
+            view.setDbStatus("Žiaden súbor nie je otvorený", false);
         }
     }
 
@@ -205,7 +214,7 @@ public class MainPresenter {
                 return;
             }
 
-            String pid = view.promptInput("Zadaj ID osoby (napr. P1):");
+            String pid = view.promptInput("Zadaj ID osoby (napr. ID10000):");
             if (pid == null || pid.isEmpty()) return;
 
             Person person = model.findPerson(pid);

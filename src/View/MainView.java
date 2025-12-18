@@ -34,9 +34,9 @@ public class MainView extends JFrame implements IMainView {
         JPanel dbPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         dbPanel.setBorder(BorderFactory.createTitledBorder("Database Management"));
 
-        btnOpenDb = new JButton("Open Database");
-        btnCreateDb = new JButton("Create New Database");
-        btnCloseDb = new JButton("Close Database");
+        btnOpenDb = new JButton("Otvor subory");
+        btnCreateDb = new JButton("Vytvor nove subory");
+        btnCloseDb = new JButton("Zavri");
         lblDbStatus = new JLabel("No database open");
         lblDbStatus.setFont(new Font("Arial", Font.BOLD, 12));
         lblDbStatus.setForeground(Color.RED);

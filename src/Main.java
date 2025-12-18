@@ -32,6 +32,7 @@ public class Main {
             runLinearHashGUI();
         }*/
 
+
         SwingUtilities.invokeLater(() -> {
             try {
                 MainModel model = new MainModel();

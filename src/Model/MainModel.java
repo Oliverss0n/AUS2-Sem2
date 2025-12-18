@@ -56,28 +56,33 @@ public class MainModel {
     }
 
 
-    public void createDatabase(String peoplePath, String testsPath,
-                               int mainBlockSize, int overflowBlockSize,
-                               int M) throws Exception {
-        if (isDbOpen) {
-            closeDatabase();
-        }
+    public void createDatabase(
+            String peoplePath,
+            String testsPath,
+            int peopleMainBlock,
+            int peopleOverflowBlock,
+            int testsMainBlock,
+            int testsOverflowBlock,
+            int peopleM,
+            int testsM
+    ) throws Exception {
+        if (isDbOpen) closeDatabase();
 
-        this.people = new LinearHashFile<>(
+        people = new LinearHashFile<>(
                 peoplePath + "_main.bin",
-                mainBlockSize,
+                peopleMainBlock,
                 peoplePath + "_overflow.bin",
-                overflowBlockSize,
-                M,
+                peopleOverflowBlock,
+                peopleM,
                 new Person()
         );
 
-        this.tests = new LinearHashFile<>(
+        tests = new LinearHashFile<>(
                 testsPath + "_main.bin",
-                mainBlockSize,
+                testsMainBlock,
                 testsPath + "_overflow.bin",
-                overflowBlockSize,
-                M,
+                testsOverflowBlock,
+                testsM,
                 new PCRTest()
         );
 
@@ -91,6 +96,7 @@ public class MainModel {
 
         isDbOpen = true;
     }
+
 
     public void closeDatabase() throws Exception {
         if (people != null) {
@@ -115,6 +121,7 @@ public class MainModel {
             throw new IllegalStateException("Database is not open! Use openDatabase() or createDatabase() first.");
         }
     }
+
 
 
     public boolean insertPerson(Person p) {
@@ -258,27 +265,6 @@ public class MainModel {
         }
     }
 
-    public ArrayList<PCRTest> getPersonTests(String personId) {
-        ArrayList<PCRTest> result = new ArrayList<>();
-
-        try {
-            checkDbOpen();
-            Person p = findPerson(personId);
-            if (p == null) return result;
-
-            ArrayList<Integer> testCodes = p.getTestCodes();
-
-            for (int code : testCodes) {
-                PCRTest test = findTest(code);
-                if (test != null) {
-                    result.add(test);
-                }
-            }
-        } catch (Exception e) {
-        }
-
-        return result;
-    }
 
     public String printPeople() {
         try {
@@ -316,7 +302,7 @@ public class MainModel {
             Person p = new Person(
                     randomString(5 + rnd.nextInt(4)),
                     randomString(6 + rnd.nextInt(5)),
-                    "P" + (personIdCounter++),
+                    "ID" + (personIdCounter++),
                     1950 + rnd.nextInt(60),
                     1 + rnd.nextInt(12),
                     1 + rnd.nextInt(28)

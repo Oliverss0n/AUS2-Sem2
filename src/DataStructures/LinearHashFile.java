@@ -5,13 +5,13 @@ import java.util.*;
 
 public class LinearHashFile<T extends IRecord<T>> {
 
-    private boolean useDensity = false;
-    private boolean useBucketSize = true;
-    private boolean useOverflowCount = false;
+    private boolean useDensity;
+    private boolean useBucketSize;
+    private boolean useOverflowCount;
 
-    private double maxDensity = 1.3;
-    private int maxBucketSize = 8;
-    private int maxOverflowBlocks = 3;
+    private double maxDensity;
+    private int maxBucketSize;
+    private int maxOverflowBlocks;
     private ArrayList<Integer> bucketRecordCount;
     private ArrayList<Integer> bucketOverflowCount;
 
@@ -72,6 +72,7 @@ public class LinearHashFile<T extends IRecord<T>> {
 
 
     public void insert(T record) throws Exception {
+
         int key = record.getHashCode();
         int index = getIndex(key);
 
@@ -87,30 +88,30 @@ public class LinearHashFile<T extends IRecord<T>> {
 
             mainFile.writeBlock(offset, block);
 
-
             bucketRecordCount.set(index, bucketRecordCount.get(index) + 1);
-
             totalRecords++;
 
         } else {
 
             newOverflowBlock = insertIntoOverflow(index, record);
 
-
             bucketRecordCount.set(index, bucketRecordCount.get(index) + 1);
             if (newOverflowBlock) {
-                bucketOverflowCount.set(index,
-                        bucketOverflowCount.get(index) + 1);
+                bucketOverflowCount.set(index, bucketOverflowCount.get(index) + 1);
             }
 
             totalRecords++;
         }
+
+        System.out.println("INSERT -> bucket addr=" + offset);
 
 
         if (shouldSplit(index)) {
             split();
         }
     }
+
+
 
 
     private boolean insertIntoOverflow(int index, T record) throws Exception {
@@ -435,12 +436,6 @@ public class LinearHashFile<T extends IRecord<T>> {
 
         for (int i = addressReuseIndex; i < originalOverflowAddresses.size(); i++) {
             long address = originalOverflowAddresses.get(i);
-
-            Block<T> emptyBlock = overflowFile.createEmptyBlock();
-            emptyBlock.setValidCount(0);
-            emptyBlock.setNext(-1);
-            overflowFile.writeBlock(address, emptyBlock);
-
             overflowFile.addToFreeList(address);
         }
 
@@ -477,20 +472,6 @@ public class LinearHashFile<T extends IRecord<T>> {
 
 
 
-    /*
-    private void saveMetadata() throws Exception {
-
-        PrintWriter pw = new PrintWriter(metadataPath);
-
-        pw.println(M);
-        pw.println(u);
-        pw.println(S);
-        pw.println(d_max);
-        pw.println(totalRecords);
-
-
-        pw.close();
-    }*/
 
     private void saveMetadata() throws Exception {
         PrintWriter pw = new PrintWriter(metadataPath);

@@ -131,7 +131,9 @@ public class Person implements IRecord<Person> {
 
             byte[] arr = baos.toByteArray();
             ArrayList<Byte> out = new ArrayList<>(arr.length);
-            for (byte b : arr) out.add(b);
+            for (byte b : arr) {
+                out.add(b);
+            }
 
             return out;
 

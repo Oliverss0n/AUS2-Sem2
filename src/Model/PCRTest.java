@@ -38,7 +38,7 @@ public class PCRTest implements IRecord<PCRTest> {
     }
 
     public static long makeTimestamp(int year, int month, int day, int hour, int minute) {
-        //validacia pre rozsahy
+
         if (year < 1000 || year > 9999) throw new IllegalArgumentException("Invalid year: " + year);
         if (month < 1 || month > 12) throw new IllegalArgumentException("Invalid month: " + month);
         if (day < 1 || day > 31) throw new IllegalArgumentException("Invalid day: " + day);
